@@ -98,7 +98,9 @@ const showEditProjectModal = ref(false);
                     <span class="overflow-ellipsis overflow-hidden">
                         {{ project.name }}
                     </span>
-                    <span class="text-text-secondary"> {{ projectTasksCount }} Tasks </span>
+                </div>
+                <div class="whitespace-nowrap min-w-0 px-3 py-4 text-sm text-text-primary">
+                    {{ projectTasksCount }}
                 </div>
                 <div class="whitespace-nowrap min-w-0 px-3 py-4 text-sm text-text-primary">
                     <div v-if="project.client_id" class="overflow-ellipsis overflow-hidden">

@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { FolderIcon, PlusIcon } from '@heroicons/vue/20/solid';
+import { PlusIcon } from '@heroicons/vue/20/solid';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import ProjectTable from '@/Components/Common/Project/ProjectTable.vue';
 import { computed, ref } from 'vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { useProjectsStore } from '@/utils/useProjects';
 import ProjectCreateModal from '@/packages/ui/src/Project/ProjectCreateModal.vue';
-import PageTitle from '@/Components/Common/PageTitle.vue';
 import { canCreateProjects } from '@/utils/permissions';
 import { useClientsQuery } from '@/utils/useClientsQuery';
 import { useClientsStore } from '@/utils/useClients';
@@ -146,28 +145,7 @@ const showBillableRate = computed(() => {
 
 <template>
     <AppLayout title="Projects" data-testid="projects_view">
-        <MainContainer
-            class="py-3 sm:pt-5 border-b border-default-background-separator flex justify-between items-center">
-            <div class="flex items-center space-x-3 sm:space-x-6">
-                <PageTitle :icon="FolderIcon" title="Projects"></PageTitle>
-            </div>
-            <SecondaryButton
-                v-if="canCreateProjects()"
-                :icon="PlusIcon"
-                @click="showCreateProjectModal = true"
-                >Create Project
-            </SecondaryButton>
-            <ProjectCreateModal
-                v-model:show="showCreateProjectModal"
-                :create-project
-                :enable-estimated-time="isAllowedToPerformPremiumAction()"
-                :create-client
-                :currency="getOrganizationCurrencyString()"
-                :organization-billable-rate="organization?.billable_rate ?? null"
-                :clients="clients"
-                @submit="createProject"></ProjectCreateModal>
-        </MainContainer>
-        <MainContainer>
+        <MainContainer class="py-3 sm:pt-5">
             <div class="flex items-center gap-2 py-1">
                 <ProjectsFilterDropdown
                     :filters="tableState.filters"
@@ -208,6 +186,24 @@ const showBillableRate = computed(() => {
                     :clients="clients"
                     @remove="removeClientFilter"
                     @update:value="tableState.filters.clientIds = $event as string[]" />
+
+                <!-- Pushed to the right edge, aligned with the filter/search row -->
+                <SecondaryButton
+                    v-if="canCreateProjects()"
+                    :icon="PlusIcon"
+                    class="ml-auto"
+                    @click="showCreateProjectModal = true"
+                    >Create Project
+                </SecondaryButton>
+                <ProjectCreateModal
+                    v-model:show="showCreateProjectModal"
+                    :create-project
+                    :enable-estimated-time="isAllowedToPerformPremiumAction()"
+                    :create-client
+                    :currency="getOrganizationCurrencyString()"
+                    :organization-billable-rate="organization?.billable_rate ?? null"
+                    :clients="clients"
+                    @submit="createProject"></ProjectCreateModal>
             </div>
         </MainContainer>
 
