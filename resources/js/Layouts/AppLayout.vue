@@ -136,7 +136,7 @@ const page = usePage<{
                     ? 'max-lg:translate-x-0 max-lg:shadow-xl'
                     : 'max-lg:-translate-x-full',
             ]"
-            class="flex-shrink-0 h-screen fixed w-[280px] px-2.5 py-4 hidden lg:flex flex-col justify-between bg-background border-r border-default-background-separator max-lg:z-50 max-lg:transition-transform max-lg:duration-200 max-lg:ease-in-out lg:w-[230px] lg:border-r-0"
+            class="flex-shrink-0 h-screen max-lg:h-[100dvh] fixed w-[280px] px-2.5 py-4 hidden lg:flex flex-col justify-between bg-background border-r border-default-background-separator max-lg:z-50 max-lg:transition-transform max-lg:duration-200 max-lg:ease-in-out lg:w-[230px] lg:border-r-0"
             :style="showSidebarMenu ? { display: 'flex' } : undefined">
             <div class="flex flex-col h-full">
                 <div
@@ -341,6 +341,7 @@ const page = usePage<{
                             @click="openPalette">
                             <MagnifyingGlassIcon class="h-4 w-4 text-icon-default" />
                         </Button>
+                        <UserSettingsIcon test-id="current_user_button_mobile"></UserSettingsIcon>
                     </div>
                 </div>
 

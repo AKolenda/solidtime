@@ -2,6 +2,7 @@
 import Dropdown from '@/packages/ui/src/Input/Dropdown.vue';
 import { computed, ref, watch } from 'vue';
 import Checkbox from '@/packages/ui/src/Input/Checkbox.vue';
+import { useResizableDropdown } from '@/packages/ui/src/Input/useResizableDropdown';
 import {
     ComboboxAnchor,
     ComboboxContent,
@@ -94,6 +95,8 @@ function toggleItem(id: string) {
 }
 
 const emit = defineEmits(['update:modelValue', 'changed', 'submit']);
+
+const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizableDropdown();
 </script>
 
 <template>
@@ -121,8 +124,11 @@ const emit = defineEmits(['update:modelValue', 'changed', 'submit']);
                 <ComboboxContent
                     :dismiss-able="false"
                     position="inline"
-                    class="mt-2 min-w-60 max-w-80">
-                    <ComboboxViewport class="max-h-60 overflow-y-auto">
+                    class="mt-2 min-w-60 max-w-none">
+                    <ComboboxViewport
+                        :ref="setResizablePanel"
+                        :style="resizablePanelStyle"
+                        class="max-h-60 max-w-80 overflow-y-auto">
                         <ComboboxVirtualizer
                             v-slot="{ option }"
                             :options="rows"
@@ -137,11 +143,14 @@ const emit = defineEmits(['update:modelValue', 'changed', 'submit']);
                                     aria-hidden="true"
                                     :tabindex="-1"
                                     class="pointer-events-none" />
-                                <span class="truncate">{{ nameForRow(option) }}</span>
+                                <span class="truncate" :title="nameForRow(option)">{{
+                                    nameForRow(option)
+                                }}</span>
                             </ComboboxItem>
                         </ComboboxVirtualizer>
                     </ComboboxViewport>
                 </ComboboxContent>
+                <div v-bind="resizeHandleProps"></div>
             </ComboboxRoot>
         </template>
     </Dropdown>

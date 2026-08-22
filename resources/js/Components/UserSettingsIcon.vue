@@ -15,6 +15,20 @@ import {
 } from '@heroicons/vue/24/solid';
 import { openFeedback } from '@/utils/feedback';
 
+withDefaults(
+    defineProps<{
+        /**
+         * Test id of the avatar trigger button. Every rendered instance needs a
+         * unique value, otherwise Playwright's `getByTestId` resolves to more
+         * than one element and fails in strict mode.
+         */
+        testId?: string;
+    }>(),
+    {
+        testId: 'current_user_button',
+    }
+);
+
 const page = usePage<{
     has_services_extension?: boolean;
     has_billing_extension?: boolean;
@@ -30,12 +44,16 @@ const logout = () => {
 };
 </script>
 <template>
-    <div class="relative">
+    <div class="relative shrink-0">
         <DropdownMenu>
             <DropdownMenuTrigger
                 class="flex text-sm border-2 outline-none border-transparent rounded-full focus-visible:ring-2 focus-visible:ring-ring transition"
                 as-child>
-                <button data-testid="current_user_button">
+                <button
+                    :data-testid="testId"
+                    type="button"
+                    aria-label="Open user menu"
+                    class="flex items-center justify-center p-1 -m-1 rounded-full">
                     <img
                         class="h-7 w-7 rounded-full object-cover"
                         :src="page.props.auth.user.profile_photo_url"

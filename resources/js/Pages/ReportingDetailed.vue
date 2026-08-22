@@ -4,7 +4,6 @@ import AppLayout from '@/Layouts/AppLayout.vue';
 import PageTitle from '@/Components/Common/PageTitle.vue';
 import {
     ChartBarIcon,
-    ClockIcon,
     EllipsisVerticalIcon,
     ArrowDownTrayIcon,
     LockClosedIcon,
@@ -31,7 +30,7 @@ import {
 import { useTagsQuery } from '@/utils/useTagsQuery';
 import { useTagsStore } from '@/utils/useTags';
 import { useSessionStorage } from '@vueuse/core';
-import TimeEntryRow from '@/packages/ui/src/TimeEntry/TimeEntryRow.vue';
+import DetailedReportTable from '@/Components/Common/Reporting/DetailedReportTable.vue';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { useProjectsStore } from '@/utils/useProjects';
@@ -39,7 +38,6 @@ import { useTasksQuery } from '@/utils/useTasksQuery';
 import { useClientsQuery } from '@/utils/useClientsQuery';
 import { useClientsStore } from '@/utils/useClients';
 import { getOrganizationCurrencyString } from '@/utils/money';
-import { useMembersQuery } from '@/utils/useMembersQuery';
 import { useQueryClient } from '@tanstack/vue-query';
 import { getCurrentOrganizationId, getCurrentMembershipId } from '@/utils/useUser';
 import ReportingTabNavbar from '@/Components/Common/Reporting/ReportingTabNavbar.vue';
@@ -79,7 +77,6 @@ const roundingEnabled = ref<boolean>(false);
 const roundingType = ref<TimeEntryRoundingType>('nearest');
 const roundingMinutes = ref<number>(15);
 
-const { members } = useMembersQuery();
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 const pageLimit = 15;
 
@@ -364,45 +361,13 @@ async function downloadExport(format: ExportFormat) {
             @submit="clearSelectionAndState"
             @select-all="selectedTimeEntries = [...timeEntries]"
             @unselect-all="selectedTimeEntries = []"></TimeEntryMassActionRow>
-        <div class="w-full relative @container">
-            <div v-for="entry in timeEntries" :key="entry.id">
-                <TimeEntryRow
-                    :selected="selectedTimeEntries.some((item) => item.id === entry.id)"
-                    :can-create-project="canCreateProjects()"
-                    :create-client
-                    :create-project
-                    :enable-estimated-time="isAllowedToPerformPremiumAction()"
-                    :projects="projects"
-                    :tasks="tasks"
-                    :tags="tags"
-                    :clients
-                    :create-tag
-                    :update-time-entry
-                    :on-start-stop-click="() => startTimeEntryFromExisting(entry)"
-                    :delete-time-entry="() => deleteTimeEntries([entry])"
-                    :currency="getOrganizationCurrencyString()"
-                    :organization-billable-rate="organization?.billable_rate ?? null"
-                    :duplicate-time-entry="() => createTimeEntry(entry)"
-                    :members="members"
-                    is-report
-                    show-date
-                    show-member
-                    :time-entry="entry"
-                    @selected="selectedTimeEntries.push(entry)"
-                    @unselected="
-                        selectedTimeEntries = selectedTimeEntries.filter(
-                            (item) => item.id !== entry.id
-                        )
-                    "></TimeEntryRow>
-            </div>
-            <div v-if="timeEntries.length === 0">
-                <div class="text-center pt-12">
-                    <ClockIcon class="w-8 text-icon-default inline pb-2"></ClockIcon>
-                    <h3 class="text-text-primary font-semibold">No time entries found</h3>
-                    <p class="pb-5">Adjust the filters to see more time entries!</p>
-                </div>
-            </div>
-        </div>
+        <DetailedReportTable
+            v-model:selected-time-entries="selectedTimeEntries"
+            :time-entries="timeEntries"
+            :update-time-entry="updateTimeEntry"
+            :delete-time-entries="deleteTimeEntries"
+            :duplicate-time-entry="(entry) => createTimeEntry(entry)"
+            :start-time-entry="startTimeEntryFromExisting"></DetailedReportTable>
 
         <Pagination v-model:page="currentPage" :total="totalPages" :items-per-page="pageLimit" />
     </AppLayout>
