@@ -1,0 +1,70 @@
+# Plain-localhost dev stack (no Traefik / no *.test hostnames).
+# Usage: docker compose -f docker-compose.local.yml up -d
+name: solidtime-local
+services:
+    app:
+        build:
+            context: ./docker/local/8.3
+            dockerfile: Dockerfile
+            args:
+                WWWGROUP: '1000'
+        image: sail-8.3/app
+        ports:
+            - '8080:80'
+        environment:
+            # Deliberately NOT /var/www/html/config (the upstream compose value):
+            # CLI tools (psysh/composer) drop state there, and Laravel's config
+            # loader then fails scanning config/ -> every request 500s.
+            XDG_CONFIG_HOME: /home/sail/.config
+            XDG_DATA_HOME: /home/sail/.local/share
+            WWWUSER: '1000'
+            LARAVEL_SAIL: 1
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        volumes:
+            - '.:/var/www/html'
+            # Read-only copy of the project, used once to seed the volumes below.
+            - './:/host-project:ro'
+            # These are read on EVERY request. On a Windows bind mount that costs
+            # ~5ms per file (~300x container-local disk), which is what made
+            # requests take 20s+. Keeping them on container-local volumes is the
+            # single biggest dev-speed win; the host copies stay untouched.
+            - 'solidtime-vendor:/var/www/html/vendor'
+            - 'solidtime-framework:/var/www/html/storage/framework'
+            - 'solidtime-bootstrap-cache:/var/www/html/bootstrap/cache'
+        depends_on:
+            pgsql:
+                condition: service_healthy
+
+    pgsql:
+        image: 'postgres:15'
+        ports:
+            - '54329:5432'
+        environment:
+            POSTGRES_DB: laravel
+            POSTGRES_USER: root
+            POSTGRES_PASSWORD: root
+        volumes:
+            - 'solidtime-local-pgsql:/var/lib/postgresql/data'
+            - './docker/local/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
+        healthcheck:
+            test: ['CMD', 'pg_isready', '-q', '-d', 'laravel', '-U', 'root']
+            interval: 5s
+            retries: 10
+            timeout: 5s
+
+    mailpit:
+        image: 'axllent/mailpit:latest'
+        ports:
+            - '1025:1025'
+            - '8025:8025'
+
+volumes:
+    solidtime-local-pgsql:
+        driver: local
+    solidtime-vendor:
+        driver: local
+    solidtime-framework:
+        driver: local
+    solidtime-bootstrap-cache:
+        driver: local
