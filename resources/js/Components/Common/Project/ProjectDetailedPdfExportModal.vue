@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { Project } from '@/packages/api/src';
 import DateRangePicker from '@/packages/ui/src/Input/DateRangePicker.vue';
-import { Modal, PrimaryButton, SecondaryButton } from '@/packages/ui/src';
+import DialogModal from '@/packages/ui/src/DialogModal.vue';
+import { PrimaryButton, SecondaryButton } from '@/packages/ui/src';
 
 defineProps<{
     project: Project | null;
@@ -18,26 +19,22 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <Modal closeable max-width="lg" :show="show" @close="show = false">
-        <div class="p-6 space-y-5 text-text-primary">
-            <div>
-                <h2 class="text-lg font-semibold">Export detailed PDF report</h2>
-                <p class="mt-1 text-sm text-text-secondary">
-                    {{ project?.name }}
-                </p>
+    <DialogModal closeable :show="show" @close="show = false">
+        <template #title>Export detailed PDF report</template>
+        <template #content>
+            <div class="space-y-5 text-text-primary">
+                <p class="text-sm text-text-secondary">{{ project?.name }}</p>
+                <div class="space-y-2">
+                    <div class="text-sm font-medium">Report period</div>
+                    <DateRangePicker v-model:start="startDate" v-model:end="endDate" />
+                </div>
             </div>
-
-            <div class="space-y-2">
-                <div class="text-sm font-medium">Report period</div>
-                <DateRangePicker v-model:start="startDate" v-model:end="endDate" />
-            </div>
-
-            <div class="flex justify-end gap-3">
-                <SecondaryButton :disabled="loading" @click="show = false">Cancel</SecondaryButton>
-                <PrimaryButton :loading="loading" @click="emit('export')">
-                    Generate PDF
-                </PrimaryButton>
-            </div>
-        </div>
-    </Modal>
+        </template>
+        <template #footer>
+            <SecondaryButton :disabled="loading" @click="show = false">Cancel</SecondaryButton>
+            <PrimaryButton class="ms-3" :loading="loading" @click="emit('export')">
+                Generate PDF
+            </PrimaryButton>
+        </template>
+    </DialogModal>
 </template>

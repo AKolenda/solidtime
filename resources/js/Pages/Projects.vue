@@ -11,7 +11,13 @@ import ProjectCreateModal from '@/packages/ui/src/Project/ProjectCreateModal.vue
 import { canCreateProjects } from '@/utils/permissions';
 import { useClientsQuery } from '@/utils/useClientsQuery';
 import { useClientsStore } from '@/utils/useClients';
-import { api, type CreateClientBody, type Client, type CreateProjectBody, type Project } from '@/packages/api/src';
+import {
+    api,
+    type CreateClientBody,
+    type Client,
+    type CreateProjectBody,
+    type Project,
+} from '@/packages/api/src';
 import { getOrganizationCurrencyString } from '@/utils/money';
 import { getCurrentOrganizationId, getCurrentRole } from '@/utils/useUser';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
@@ -23,6 +29,7 @@ import ProjectVisibilityFilterBadge from '@/Components/Common/Project/ProjectVis
 import ProjectClientFilterBadge from '@/Components/Common/Project/ProjectClientFilterBadge.vue';
 import { NO_CLIENT_ID } from '@/Components/Common/Project/constants';
 import type { SortColumn, SortDirection } from '@/Components/Common/Project/ProjectTable.vue';
+import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import { useTasksQuery } from '@/utils/useTasksQuery';
 import { projectMatchesSearch } from '@/utils/projectSearch';
 import ProjectDetailedPdfExportModal from '@/Components/Common/Project/ProjectDetailedPdfExportModal.vue';
@@ -78,7 +85,9 @@ function handleSort(column: SortColumn, direction: SortDirection) {
 // the table silently filtered by a term the user has forgotten about.
 const search = ref('');
 
-const clientNames = computed(() => new Map(clients.value.map((client) => [client.id, client.name])));
+const clientNames = computed(
+    () => new Map(clients.value.map((client) => [client.id, client.name]))
+);
 const taskNamesByProject = computed(() => {
     const names = new Map<string, string[]>();
 
@@ -207,7 +216,10 @@ async function exportDetailedPdf() {
                     params: { organization: getCurrentOrganizationId()! },
                     queries: {
                         format: 'pdf',
-                        start: getLocalizedDayJs(exportStartDate.value).startOf('day').utc().format(),
+                        start: getLocalizedDayJs(exportStartDate.value)
+                            .startOf('day')
+                            .utc()
+                            .format(),
                         end: getLocalizedDayJs(exportEndDate.value).endOf('day').utc().format(),
                         active: 'false',
                         project_ids: [project.id],
@@ -249,12 +261,12 @@ async function exportDetailedPdf() {
                     @update:filters="tableState.filters = $event" />
 
                 <!-- Same style as the dropdown search inputs, see MultiselectDropdown.vue -->
-                <input
+                <TextInput
                     v-model="search"
                     type="search"
                     data-testid="project_search"
                     placeholder="Search projects, clients, tasks..."
-                    class="w-60 h-8 rounded-md border border-input-border bg-input-background px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none" />
+                    class="w-60 h-8" />
 
                 <!-- Active Filters -->
                 <ProjectStatusFilterBadge
