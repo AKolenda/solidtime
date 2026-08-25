@@ -1,0 +1,6 @@
+# Add this file after the production Solidtime Compose file.
+# Example: docker compose -f docker-compose.yml -f docker-compose.backups.yml up -d
+services:
+    scheduler:
+        volumes:
+            - '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}:/backups'
