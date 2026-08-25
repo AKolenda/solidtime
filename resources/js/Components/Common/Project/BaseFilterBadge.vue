@@ -7,6 +7,7 @@ defineProps<{
     icon: Component;
     label: string;
     filterName: string;
+    contentClass?: string;
 }>();
 
 defineEmits<{
@@ -30,7 +31,7 @@ defineSlots<{
                 <span class="text-foreground">{{ label }}</span>
                 <ChevronDownIcon class="h-3 w-3 text-muted-foreground" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent align="start" :class="contentClass">
                 <slot />
             </DropdownMenuContent>
         </DropdownMenu>

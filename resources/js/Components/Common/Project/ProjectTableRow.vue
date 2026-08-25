@@ -39,6 +39,10 @@ const props = defineProps<{
     showBillableRate: boolean;
 }>();
 
+const emit = defineEmits<{
+    exportDetailedPdf: [project: Project];
+}>();
+
 const client = computed(() => {
     return clients.value.find((client) => client.id === props.project.client_id);
 });
@@ -160,6 +164,7 @@ const showEditProjectModal = ref(false);
                     class="relative whitespace-nowrap flex items-center pl-3 text-right text-sm font-medium pr-4 sm:pr-6 lg:pr-8 3xl:pr-12">
                     <ProjectMoreOptionsDropdown
                         :project="project"
+                        @export-detailed-pdf="emit('exportDetailedPdf', project)"
                         @edit="showEditProjectModal = true"
                         @archive="archiveProject"
                         @delete="deleteProject"></ProjectMoreOptionsDropdown>

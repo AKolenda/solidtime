@@ -158,7 +158,7 @@ class TimeEntryIndexRequest extends BaseFormRequest
             'limit' => [
                 'integer',
                 'min:1',
-                'max:500',
+                'max:10000',
             ],
             // Skip the first n time entries (default: 0)
             'offset' => [

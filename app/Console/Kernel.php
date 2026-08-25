@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console;
 
+use App\Service\SelfHost\DatabaseBackupConfiguration;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -14,6 +15,15 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        $databaseBackup = DatabaseBackupConfiguration::load();
+
+        if ($databaseBackup->enabled) {
+            $schedule->command('self-host:backup-database')
+                ->dailyAt($databaseBackup->time)
+                ->timezone($databaseBackup->timezone)
+                ->withoutOverlapping(180);
+        }
+
         $schedule->command('time-entry:send-still-running-mails')
             ->when(fn (): bool => config('scheduling.tasks.time_entry_send_still_running_mails'))
             ->everyTenMinutes();

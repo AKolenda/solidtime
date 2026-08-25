@@ -134,8 +134,8 @@ class TimeEntryController extends Controller
         $totalCount = $timeEntriesQuery->count();
 
         $limit = $request->getLimit();
-        if ($limit > 1000) {
-            $limit = 1000;
+        if ($limit > 10000) {
+            $limit = 10000;
         }
         $timeEntriesQuery->limit($limit);
         $timeEntriesQuery->skip($request->getOffset());

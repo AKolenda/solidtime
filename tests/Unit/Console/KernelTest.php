@@ -111,4 +111,34 @@ class KernelTest extends TestCase
         // Assert
         $this->assertCount(0, $events);
     }
+
+    public function test_database_backup_can_be_scheduled_from_configuration(): void
+    {
+        config([
+            'database-backup.enabled' => true,
+            'database-backup.time' => '03:30',
+            'database-backup.timezone' => 'America/Edmonton',
+        ]);
+
+        $schedule = app()->make(Kernel::class)->resolveConsoleSchedule();
+        $events = collect($schedule->events())->filter(
+            fn ($event) => str_contains($event->command, 'self-host:backup-database')
+        );
+
+        $this->assertCount(1, $events);
+        $this->assertSame('30 3 * * *', $events->first()->expression);
+        $this->assertSame('America/Edmonton', $events->first()->timezone);
+    }
+
+    public function test_database_backup_schedule_is_disabled_by_default(): void
+    {
+        config(['database-backup.enabled' => false]);
+
+        $schedule = app()->make(Kernel::class)->resolveConsoleSchedule();
+        $events = collect($schedule->events())->filter(
+            fn ($event) => str_contains($event->command, 'self-host:backup-database')
+        );
+
+        $this->assertCount(0, $events);
+    }
 }

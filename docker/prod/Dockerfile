@@ -70,6 +70,7 @@ RUN apt-get update; \
     git \
     ncdu \
     procps \
+    postgresql-client \
     unzip \
     ca-certificates \
     supervisor \

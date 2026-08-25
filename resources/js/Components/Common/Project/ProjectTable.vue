@@ -44,6 +44,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     sort: [column: SortColumn, direction: SortDirection];
+    exportDetailedPdf: [project: Project];
 }>();
 
 const { clients } = useClientsQuery();
@@ -219,7 +220,8 @@ const gridTemplate = computed(() => {
                 <template v-for="project in paginatedProjects" :key="project.id">
                     <ProjectTableRow
                         :show-billable-rate="props.showBillableRate"
-                        :project="project"></ProjectTableRow>
+                        :project="project"
+                        @export-detailed-pdf="emit('exportDetailedPdf', $event)"></ProjectTableRow>
                 </template>
             </div>
         </div>

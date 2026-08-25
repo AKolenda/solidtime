@@ -52,6 +52,7 @@ function toggleNoClient() {
         :icon="UserGroupIcon"
         :label="label"
         filter-name="Client"
+        content-class="max-h-[300px] overflow-y-auto"
         @remove="emit('remove')">
         <DropdownMenuCheckboxItem :model-value="hasNoClient" @select.prevent="toggleNoClient">
             No client

@@ -832,6 +832,31 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $response->assertJsonPath('data.*.id', [$timeEntry->getKey()]);
     }
 
+    public function test_index_endpoint_accepts_custom_ten_thousand_limit_without_clamping_to_one_thousand(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'time-entries:view:own',
+        ]);
+        TimeEntry::factory()
+            ->forOrganization($data->organization)
+            ->forMember($data->member)
+            ->createMany(1001);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.time-entries.index', [
+            $data->organization->getKey(),
+            'member_id' => $data->member->getKey(),
+            'limit' => 10_000,
+        ]));
+
+        // Assert
+        $this->assertResponseCode($response, 200);
+        $response->assertJsonCount(1001, 'data');
+        $response->assertJsonPath('meta.total', 1001);
+    }
+
     public function test_index_export_endpoint_fails_if_user_has_no_permission_to_view_time_entries(): void
     {
         // Arrange
@@ -1002,10 +1027,11 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
             'time-entries:view:all',
         ]);
         Passport::actingAs($data->user);
-        $client = Client::factory()->forOrganization($data->organization)->create();
-        $project = Project::factory()->forOrganization($data->organization)->forClient($client)->create();
+        $client = Client::factory()->forOrganization($data->organization)->create(['name' => 'PDF Client']);
+        $project = Project::factory()->forOrganization($data->organization)->forClient($client)->create(['name' => 'PDF Project']);
+        $task = Task::factory()->forOrganization($data->organization)->forProject($project)->create(['name' => 'PDF Task']);
         $timeEntry1 = TimeEntry::factory()->forOrganization($data->organization)->forMember($data->member)->startWithDuration(Carbon::now(), 100)->create();
-        $timeEntry2 = TimeEntry::factory()->forOrganization($data->organization)->forProject($project)->forMember($data->member)->startWithDuration(Carbon::now(), 100)->create();
+        $timeEntry2 = TimeEntry::factory()->forOrganization($data->organization)->forProject($project)->forTask($task)->forMember($data->member)->startWithDuration(Carbon::now(), 100)->create();
         $this->actAsOrganizationWithSubscription();
 
         // Act
@@ -1014,10 +1040,21 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
             'format' => ExportFormat::PDF,
             'start' => Carbon::now()->startOfYear()->toIso8601ZuluString(),
             'end' => Carbon::now()->endOfYear()->toIso8601ZuluString(),
+            'debug' => 'true',
         ]));
 
         // Assert
         $this->assertResponseCode($response, 200);
+        $html = (string) $response->json('html');
+        $this->assertStringContainsString('<th>Project</th>', $html);
+        $this->assertStringContainsString('<th>Task</th>', $html);
+        $this->assertStringContainsString('<th>Client</th>', $html);
+        $this->assertStringContainsString('PDF Project', $html);
+        $this->assertStringContainsString('PDF Task', $html);
+        $this->assertStringContainsString('PDF Client', $html);
+        $this->assertStringNotContainsString('<th>Time Entry</th>', $html);
+        $this->assertStringNotContainsString('<th>Billable</th>', $html);
+        $this->assertStringNotContainsString('<th>Break</th>', $html);
     }
 
     public function test_index_export_endpoint_can_create_a_detailed_time_entry_report_in_format_csv_as_employee_role_with_show_billable_rate(): void

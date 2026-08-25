@@ -11,7 +11,7 @@ import ProjectCreateModal from '@/packages/ui/src/Project/ProjectCreateModal.vue
 import { canCreateProjects } from '@/utils/permissions';
 import { useClientsQuery } from '@/utils/useClientsQuery';
 import { useClientsStore } from '@/utils/useClients';
-import type { CreateClientBody, Client, CreateProjectBody, Project } from '@/packages/api/src';
+import { api, type CreateClientBody, type Client, type CreateProjectBody, type Project } from '@/packages/api/src';
 import { getOrganizationCurrencyString } from '@/utils/money';
 import { getCurrentOrganizationId, getCurrentRole } from '@/utils/useUser';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
@@ -23,10 +23,18 @@ import ProjectVisibilityFilterBadge from '@/Components/Common/Project/ProjectVis
 import ProjectClientFilterBadge from '@/Components/Common/Project/ProjectClientFilterBadge.vue';
 import { NO_CLIENT_ID } from '@/Components/Common/Project/constants';
 import type { SortColumn, SortDirection } from '@/Components/Common/Project/ProjectTable.vue';
+import { useTasksQuery } from '@/utils/useTasksQuery';
+import { projectMatchesSearch } from '@/utils/projectSearch';
+import ProjectDetailedPdfExportModal from '@/Components/Common/Project/ProjectDetailedPdfExportModal.vue';
+import ReportingExportModal from '@/Components/Common/Reporting/ReportingExportModal.vue';
+import UpgradeModal from '@/Components/Common/UpgradeModal.vue';
+import { useNotificationsStore } from '@/utils/notification';
+import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 
 // Fetch data using TanStack Query
 const { projects } = useProjectsQuery();
 const { clients } = useClientsQuery();
+const { tasks } = useTasksQuery();
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 
 // Table state persisted in localStorage
@@ -70,13 +78,34 @@ function handleSort(column: SortColumn, direction: SortDirection) {
 // the table silently filtered by a term the user has forgotten about.
 const search = ref('');
 
+const clientNames = computed(() => new Map(clients.value.map((client) => [client.id, client.name])));
+const taskNamesByProject = computed(() => {
+    const names = new Map<string, string[]>();
+
+    for (const task of tasks.value) {
+        const projectTasks = names.get(task.project_id) ?? [];
+        projectTasks.push(task.name);
+        names.set(task.project_id, projectTasks);
+    }
+
+    return names;
+});
+
 // Filter projects based on current filters
 const filteredProjects = computed(() => {
     const searchTerm = search.value.trim().toLowerCase();
 
     return projects.value.filter((project) => {
-        // Name search
-        if (searchTerm && !project.name.toLowerCase().includes(searchTerm)) {
+        // Search all useful project details, including related client and task names.
+        if (
+            searchTerm &&
+            !projectMatchesSearch(
+                project,
+                searchTerm,
+                project.client_id ? clientNames.value.get(project.client_id) : undefined,
+                taskNamesByProject.value.get(project.id) ?? []
+            )
+        ) {
             return false;
         }
 
@@ -141,10 +170,77 @@ const showBillableRate = computed(() => {
         getCurrentRole() !== 'employee' || organization.value?.employees_can_see_billable_rates
     );
 });
+
+const selectedExportProject = ref<Project | null>(null);
+const showProjectExportModal = ref(false);
+const showExportReadyModal = ref(false);
+const showPremiumModal = ref(false);
+const exportLoading = ref(false);
+const exportUrl = ref<string | null>(null);
+const exportStartDate = ref(
+    getLocalizedDayJs(getDayJsInstance()().format()).subtract(30, 'day').format()
+);
+const exportEndDate = ref(getLocalizedDayJs(getDayJsInstance()().format()).format());
+const { handleApiRequestNotifications } = useNotificationsStore();
+
+function openDetailedPdfExport(project: Project) {
+    if (!isAllowedToPerformPremiumAction()) {
+        showPremiumModal.value = true;
+        return;
+    }
+
+    selectedExportProject.value = project;
+    showProjectExportModal.value = true;
+}
+
+async function exportDetailedPdf() {
+    if (!selectedExportProject.value) return;
+
+    const project = selectedExportProject.value;
+    exportLoading.value = true;
+    let response;
+
+    try {
+        response = await handleApiRequestNotifications(
+            () =>
+                api.exportTimeEntries({
+                    params: { organization: getCurrentOrganizationId()! },
+                    queries: {
+                        format: 'pdf',
+                        start: getLocalizedDayJs(exportStartDate.value).startOf('day').utc().format(),
+                        end: getLocalizedDayJs(exportEndDate.value).endOf('day').utc().format(),
+                        active: 'false',
+                        project_ids: [project.id],
+                    },
+                }),
+            'Project report created',
+            'Project report export failed'
+        );
+    } finally {
+        exportLoading.value = false;
+    }
+
+    if (response?.download_url) {
+        exportUrl.value = response.download_url as string;
+        showProjectExportModal.value = false;
+        showExportReadyModal.value = true;
+    }
+}
 </script>
 
 <template>
     <AppLayout title="Projects" data-testid="projects_view">
+        <ProjectDetailedPdfExportModal
+            v-model:show="showProjectExportModal"
+            v-model:start-date="exportStartDate"
+            v-model:end-date="exportEndDate"
+            :project="selectedExportProject"
+            :loading="exportLoading"
+            @export="exportDetailedPdf" />
+        <ReportingExportModal v-model:show="showExportReadyModal" :export-url="exportUrl" />
+        <UpgradeModal v-model:show="showPremiumModal">
+            <strong>PDF Reports</strong> are only available in solidtime Professional.
+        </UpgradeModal>
         <MainContainer class="py-3 sm:pt-5">
             <div class="flex items-center gap-2 py-1">
                 <ProjectsFilterDropdown
@@ -157,7 +253,7 @@ const showBillableRate = computed(() => {
                     v-model="search"
                     type="search"
                     data-testid="project_search"
-                    placeholder="Search for a Project..."
+                    placeholder="Search projects, clients, tasks..."
                     class="w-60 h-8 rounded-md border border-input-border bg-input-background px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none" />
 
                 <!-- Active Filters -->
@@ -212,6 +308,7 @@ const showBillableRate = computed(() => {
             :projects="filteredProjects"
             :sort-column="tableState.sortColumn"
             :sort-direction="tableState.sortDirection"
+            @export-detailed-pdf="openDetailedPdfExport"
             @sort="handleSort"></ProjectTable>
     </AppLayout>
 </template>

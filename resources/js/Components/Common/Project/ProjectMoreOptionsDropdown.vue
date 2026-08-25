@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { TrashIcon, PencilSquareIcon, ArchiveBoxIcon } from '@heroicons/vue/20/solid';
+import {
+    TrashIcon,
+    PencilSquareIcon,
+    ArchiveBoxIcon,
+    DocumentArrowDownIcon,
+} from '@heroicons/vue/20/solid';
 import type { Project } from '@/packages/api/src';
-import { canDeleteProjects, canUpdateProjects } from '@/utils/permissions';
+import { canDeleteProjects, canUpdateProjects, canViewAllTimeEntries } from '@/utils/permissions';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -13,6 +18,7 @@ const emit = defineEmits<{
     delete: [];
     edit: [];
     archive: [];
+    exportDetailedPdf: [];
 }>();
 const props = defineProps<{
     project: Project;
@@ -40,6 +46,15 @@ const props = defineProps<{
             </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent class="min-w-[150px]" align="end">
+            <DropdownMenuItem
+                v-if="canViewAllTimeEntries()"
+                :aria-label="'Export detailed PDF report for ' + props.project.name"
+                data-testid="project_export_detailed_pdf"
+                class="flex items-center space-x-3 cursor-pointer"
+                @click.prevent="emit('exportDetailedPdf')">
+                <DocumentArrowDownIcon class="w-5 text-icon-active" />
+                <span>Export detailed PDF report</span>
+            </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canUpdateProjects()"
                 :aria-label="'Edit Project ' + props.project.name"

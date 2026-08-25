@@ -153,32 +153,21 @@
         <table style="width: 100%;">
             <thead>
             <tr style="border-top: 1px #d4d4d8 solid;">
-                <th>Time Entry</th>
+                <th>Project</th>
+                <th>Task</th>
+                <th>Client</th>
                 <th>User</th>
                 <th style="text-align: center;">Time</th>
                 <th>Duration</th>
-                <th>Billable</th>
-                <th>Break</th>
                 <th>Tags</th>
             </tr>
             </thead>
             <tbody>
             @foreach($timeEntries as $timeEntry)
                 <tr>
-                    <td style="overflow-wrap: break-word; max-width: 250px;">
-                        {{ $timeEntry->description === '' ? '-' : $timeEntry->description }} <br>
-                        @if($timeEntry->task?->name)
-                            <span style="font-weight: 600;">Task:</span> {{ $timeEntry->task?->name ?? '-' }} <br>
-                        @endif
-                        @if($timeEntry->project?->name)
-                            <span style="font-weight: 600;">Project:</span> {{ $timeEntry->project?->name }} <br>
-                        @endif
-                        @if($timeEntry->client?->name)
-                            <span style="font-weight: 600;">
-                                    Client:
-                                </span>{{ $timeEntry->client?->name }} <br>
-                        @endif
-                    </td>
+                    <td style="overflow-wrap: break-word; max-width: 180px;">{{ $timeEntry->project?->name ?? '-' }}</td>
+                    <td style="overflow-wrap: break-word; max-width: 140px;">{{ $timeEntry->task?->name ?? '-' }}</td>
+                    <td style="overflow-wrap: break-word; max-width: 140px;">{{ $timeEntry->client?->name ?? '-' }}</td>
                     <td style="overflow-wrap: break-word; min-width: 75px;">{{ $timeEntry->user->name }}</td>
                     <td style="overflow-wrap: break-word; min-width: 150px; text-align: center;">
                         @if($timeEntry->start->timezone($timezone)->format('Y-m-d') === $timeEntry->end->timezone($timezone)->format('Y-m-d'))
@@ -192,8 +181,6 @@
                     <td style="overflow-wrap: break-word; min-width: 75px;">
                         {{ $localization->formatIntervalForReporting($timeEntry->getDuration()) }}
                     </td>
-                    <td style="overflow-wrap: break-word;">{{ $timeEntry->billable ? 'Yes' : 'No' }}</td>
-                    <td style="overflow-wrap: break-word;">{{ $timeEntry->type === \App\Enums\TimeEntryType::Break ? 'Yes' : 'No' }}</td>
                     <td style="overflow-wrap: break-word; min-width: 75px;">{{ count($timeEntry->tagsRelation) === 0 ? '-' : $timeEntry->tagsRelation->implode('name', ', ') }}</td>
                 </tr>
             @endforeach
