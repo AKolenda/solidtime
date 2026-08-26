@@ -59,6 +59,10 @@ class OrganizationResource extends BaseResource
             'prevent_overlapping_time_entries' => $this->resource->prevent_overlapping_time_entries,
             /** @var bool $breaks_enabled Whether members of the organization can track breaks */
             'breaks_enabled' => $this->resource->breaks_enabled,
+            /** @var bool $shop_report_enabled Use the shop-specific single-project PDF layout */
+            'shop_report_enabled' => $this->resource->shop_report_enabled,
+            /** @var string|null $shop_report_logo Data URL for the report logo */
+            'shop_report_logo' => $this->resource->shop_report_logo,
             /** @var string $currency Currency code (ISO 4217) */
             'currency' => $this->resource->currency,
             /** @var string $currency_symbol Currency symbol */

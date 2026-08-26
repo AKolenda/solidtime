@@ -35,6 +35,8 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property bool $employees_can_manage_tasks
  * @property bool $prevent_overlapping_time_entries
  * @property bool $breaks_enabled
+ * @property bool $shop_report_enabled
+ * @property string|null $shop_report_logo
  * @property User $owner
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -72,6 +74,7 @@ class Organization extends Model implements AuditableContract
         'employees_can_manage_tasks' => 'boolean',
         'prevent_overlapping_time_entries' => 'boolean',
         'breaks_enabled' => 'boolean',
+        'shop_report_enabled' => 'boolean',
         'number_format' => NumberFormat::class,
         'currency_format' => CurrencyFormat::class,
         'date_format' => DateFormat::class,

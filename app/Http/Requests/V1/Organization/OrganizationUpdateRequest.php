@@ -54,6 +54,15 @@ class OrganizationUpdateRequest extends BaseFormRequest
             'breaks_enabled' => [
                 'boolean',
             ],
+            'shop_report_enabled' => [
+                'boolean',
+            ],
+            'shop_report_logo' => [
+                'nullable',
+                'string',
+                'max:1400000',
+                'regex:/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+\/=]+$/',
+            ],
             'number_format' => [
                 Rule::enum(NumberFormat::class),
             ],
@@ -132,5 +141,15 @@ class OrganizationUpdateRequest extends BaseFormRequest
     public function getBreaksEnabled(): ?bool
     {
         return $this->has('breaks_enabled') ? $this->boolean('breaks_enabled') : null;
+    }
+
+    public function getShopReportEnabled(): ?bool
+    {
+        return $this->has('shop_report_enabled') ? $this->boolean('shop_report_enabled') : null;
+    }
+
+    public function getShopReportLogo(): ?string
+    {
+        return $this->has('shop_report_logo') ? $this->input('shop_report_logo') : null;
     }
 }

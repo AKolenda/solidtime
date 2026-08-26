@@ -5,6 +5,7 @@ import { PlusIcon } from '@heroicons/vue/20/solid';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import ProjectTable from '@/Components/Common/Project/ProjectTable.vue';
 import { computed, ref } from 'vue';
+import { useQuery } from '@tanstack/vue-query';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { useProjectsStore } from '@/utils/useProjects';
 import ProjectCreateModal from '@/packages/ui/src/Project/ProjectCreateModal.vue';
@@ -37,12 +38,16 @@ import ReportingExportModal from '@/Components/Common/Reporting/ReportingExportM
 import UpgradeModal from '@/Components/Common/UpgradeModal.vue';
 import { useNotificationsStore } from '@/utils/notification';
 import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import DateRangePicker from '@/packages/ui/src/Input/DateRangePicker.vue';
 
 // Fetch data using TanStack Query
 const { projects } = useProjectsQuery();
 const { clients } = useClientsQuery();
 const { tasks } = useTasksQuery();
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
+const sortedClients = computed(() =>
+    [...clients.value].sort((a, b) => a.name.localeCompare(b.name))
+);
 
 // Table state persisted in localStorage
 interface ProjectTableState {
@@ -56,13 +61,13 @@ interface ProjectTableState {
 }
 
 const tableState = useStorage<ProjectTableState>(
-    'project-table-state',
+    'project-table-state-v2',
     {
         sortColumn: 'name',
         sortDirection: 'asc',
         filters: {
             clientIds: [],
-            status: 'all',
+            status: 'active',
             visibility: 'all',
         },
     },
@@ -81,9 +86,36 @@ function handleSort(column: SortColumn, direction: SortDirection) {
     tableState.value.sortDirection = direction;
 }
 
-// Search is intentionally not persisted in tableState, so a reload never leaves
-// the table silently filtered by a term the user has forgotten about.
-const search = ref('');
+// Keep each organization's search when navigating into a project and back.
+const search = useStorage(`project-search-${getCurrentOrganizationId() ?? 'default'}`, '');
+const filterStartDate = ref(
+    getLocalizedDayJs(getDayJsInstance()().format()).startOf('year').format()
+);
+const filterEndDate = ref(getLocalizedDayJs(getDayJsInstance()().format()).format());
+const activityQuery = useQuery({
+    queryKey: computed(() => ['project-activity', filterStartDate.value, filterEndDate.value]),
+    queryFn: async () => {
+        const ids = new Set<string>();
+        let offset = 0;
+        let total = 0;
+        do {
+            const response = await api.getTimeEntries({
+                params: { organization: getCurrentOrganizationId()! },
+                queries: {
+                    start: getLocalizedDayJs(filterStartDate.value).startOf('day').utc().format(),
+                    end: getLocalizedDayJs(filterEndDate.value).endOf('day').utc().format(),
+                    active: 'false',
+                    limit: 500,
+                    offset,
+                },
+            });
+            response.data.forEach((entry) => entry.project_id && ids.add(entry.project_id));
+            total = response.meta.total;
+            offset += response.data.length;
+        } while (offset < total);
+        return ids;
+    },
+});
 
 const clientNames = computed(
     () => new Map(clients.value.map((client) => [client.id, client.name]))
@@ -105,6 +137,7 @@ const filteredProjects = computed(() => {
     const searchTerm = search.value.trim().toLowerCase();
 
     return projects.value.filter((project) => {
+        if (activityQuery.data.value && !activityQuery.data.value.has(project.id)) return false;
         // Search all useful project details, including related client and task names.
         if (
             searchTerm &&
@@ -186,9 +219,7 @@ const showExportReadyModal = ref(false);
 const showPremiumModal = ref(false);
 const exportLoading = ref(false);
 const exportUrl = ref<string | null>(null);
-const exportStartDate = ref(
-    getLocalizedDayJs(getDayJsInstance()().format()).subtract(30, 'day').format()
-);
+const exportStartDate = ref(getLocalizedDayJs('1970-01-01').startOf('day').format());
 const exportEndDate = ref(getLocalizedDayJs(getDayJsInstance()().format()).format());
 const { handleApiRequestNotifications } = useNotificationsStore();
 
@@ -203,7 +234,7 @@ function openDetailedPdfExport(project: Project) {
 }
 
 async function exportDetailedPdf() {
-    if (!selectedExportProject.value) return;
+    if (!selectedExportProject.value || exportLoading.value) return;
 
     const project = selectedExportProject.value;
     exportLoading.value = true;
@@ -254,10 +285,10 @@ async function exportDetailedPdf() {
             <strong>PDF Reports</strong> are only available in solidtime Professional.
         </UpgradeModal>
         <MainContainer class="py-3 sm:pt-5">
-            <div class="flex items-center gap-2 py-1">
+            <div class="flex flex-wrap items-center gap-2 py-1">
                 <ProjectsFilterDropdown
                     :filters="tableState.filters"
-                    :clients="clients"
+                    :clients="sortedClients"
                     @update:filters="tableState.filters = $event" />
 
                 <!-- Same style as the dropdown search inputs, see MultiselectDropdown.vue -->
@@ -267,6 +298,8 @@ async function exportDetailedPdf() {
                     data-testid="project_search"
                     placeholder="Search projects, clients, tasks..."
                     class="w-60 h-8" />
+
+                <DateRangePicker v-model:start="filterStartDate" v-model:end="filterEndDate" />
 
                 <!-- Active Filters -->
                 <ProjectStatusFilterBadge
@@ -291,7 +324,7 @@ async function exportDetailedPdf() {
                     v-if="tableState.filters.clientIds.length > 0"
                     data-testid="client-filter-badge"
                     :value="tableState.filters.clientIds"
-                    :clients="clients"
+                    :clients="sortedClients"
                     @remove="removeClientFilter"
                     @update:value="tableState.filters.clientIds = $event as string[]" />
 
@@ -310,7 +343,7 @@ async function exportDetailedPdf() {
                     :create-client
                     :currency="getOrganizationCurrencyString()"
                     :organization-billable-rate="organization?.billable_rate ?? null"
-                    :clients="clients"
+                    :clients="sortedClients"
                     @submit="createProject"></ProjectCreateModal>
             </div>
         </MainContainer>

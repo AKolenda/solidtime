@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Console;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Process\PendingProcess;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
@@ -12,6 +13,8 @@ use Tests\TestCase;
 
 class SelfHostDatabaseBackupCommandTest extends TestCase
 {
+    use RefreshDatabase;
+
     private string $backupRoot;
 
     protected function setUp(): void
@@ -23,7 +26,7 @@ class SelfHostDatabaseBackupCommandTest extends TestCase
         Carbon::setTestNow('2026-08-25 12:34:56');
 
         config([
-            'database.default' => 'pgsql',
+            'database-backup.connection' => 'pgsql',
             'database.connections.pgsql.host' => 'pgsql',
             'database.connections.pgsql.port' => 5432,
             'database.connections.pgsql.database' => 'solidtime',
@@ -72,6 +75,11 @@ class SelfHostDatabaseBackupCommandTest extends TestCase
         $this->assertFileDoesNotExist($finalPath.'.partial');
         $this->assertFileDoesNotExist($expiredBackup);
         $this->assertFileExists($unrelatedFile);
+        $this->assertDatabaseHas('database_backup_runs', [
+            'status' => 'completed',
+            'filename' => 'solidtime-20260825-123456.dump',
+            'validated' => true,
+        ]);
 
         Process::assertRan(function (PendingProcess $process): bool {
             return is_array($process->command)
@@ -106,5 +114,9 @@ class SelfHostDatabaseBackupCommandTest extends TestCase
             ->assertFailed();
 
         $this->assertSame([], glob($this->backupRoot.'/*.dump*'));
+        $this->assertDatabaseHas('database_backup_runs', [
+            'status' => 'failed',
+            'validated' => false,
+        ]);
     }
 }

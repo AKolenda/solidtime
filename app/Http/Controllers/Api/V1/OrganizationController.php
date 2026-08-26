@@ -81,6 +81,12 @@ class OrganizationController extends Controller
         if ($request->getBreaksEnabled() !== null) {
             $organization->breaks_enabled = $request->getBreaksEnabled();
         }
+        if ($request->getShopReportEnabled() !== null) {
+            $organization->shop_report_enabled = $request->getShopReportEnabled();
+        }
+        if ($request->has('shop_report_logo')) {
+            $organization->shop_report_logo = $request->getShopReportLogo();
+        }
         $hasBillableRate = $request->has('billable_rate');
         if ($hasBillableRate) {
             $oldBillableRate = $organization->billable_rate;

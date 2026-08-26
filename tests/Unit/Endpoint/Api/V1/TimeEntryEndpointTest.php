@@ -23,8 +23,10 @@ use App\Models\Tag;
 use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Service\TimeEntryAggregationService;
 use App\Service\TimeEntryFilter;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -33,6 +35,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Passport\Passport;
+use Mockery\MockInterface;
 use PHPUnit\Framework\Attributes\UsesClass;
 use Ramsey\Uuid\Type\Time;
 use TiMacDonald\Log\LogEntry;
@@ -1055,6 +1058,85 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $this->assertStringNotContainsString('<th>Time Entry</th>', $html);
         $this->assertStringNotContainsString('<th>Billable</th>', $html);
         $this->assertStringNotContainsString('<th>Break</th>', $html);
+    }
+
+    public function test_shop_pdf_export_skips_the_unused_aggregate_query(): void
+    {
+        $data = $this->createUserWithPermission([
+            'time-entries:view:all',
+        ]);
+        $data->organization->update(['shop_report_enabled' => true]);
+        Passport::actingAs($data->user);
+        $project = Project::factory()
+            ->forOrganization($data->organization)
+            ->create(['name' => '639893 - 47321 - 10pcs - QT18.00 - QM6.00']);
+        $task = Task::factory()
+            ->forOrganization($data->organization)
+            ->forProject($project)
+            ->create(['name' => 'Turning - Running']);
+        TimeEntry::factory()
+            ->forOrganization($data->organization)
+            ->forProject($project)
+            ->forTask($task)
+            ->forMember($data->member)
+            ->startWithDuration(Carbon::now(), 100)
+            ->create();
+        $this->actAsOrganizationWithSubscription();
+        $this->mock(TimeEntryAggregationService::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('getAggregatedTimeEntries');
+        });
+
+        $response = $this->getJson(route('api.v1.time-entries.index-export', [
+            $data->organization->getKey(),
+            'format' => ExportFormat::PDF,
+            'start' => Carbon::now()->startOfYear()->toIso8601ZuluString(),
+            'end' => Carbon::now()->endOfYear()->toIso8601ZuluString(),
+            'project_ids' => [$project->getKey()],
+            'debug' => 'true',
+        ]));
+
+        $response->assertOk();
+        $html = (string) $response->json('html');
+        $this->assertStringContainsString('Production time report', $html);
+        $this->assertStringContainsString('Project 639893 - 47321 - 10pcs - QT18.00 - QM6.00', $html);
+        $this->assertStringContainsString('<th>Operation</th>', $html);
+        $this->assertStringContainsString('<th>User</th><th>Duration</th><th>Notes</th><th>Tags</th>', $html);
+        $this->assertStringContainsString('class="user-time"', $html);
+        $this->assertStringContainsString('<span>Total time</span>', $html);
+        $this->assertStringContainsString('<span>Total Running</span>', $html);
+        $this->assertStringContainsString('<span>Combined Running Average Per Piece</span>', $html);
+        $this->assertStringContainsString('Combined Turning + Milling running time divided by the total project quantity.', $html);
+        $this->assertStringNotContainsString('<th style="text-align: center;">Time</th>', $html);
+    }
+
+    public function test_index_export_endpoint_rejects_a_second_pdf_export_for_the_same_user_while_one_is_running(): void
+    {
+        $data = $this->createUserWithPermission([
+            'time-entries:view:all',
+        ]);
+        Passport::actingAs($data->user);
+        $this->actAsOrganizationWithSubscription();
+        $lock = Cache::lock(
+            'time-entry-pdf-export:'.$data->organization->getKey().':'.$data->user->getKey(),
+            300
+        );
+        $this->assertTrue($lock->get());
+
+        try {
+            $response = $this->getJson(route('api.v1.time-entries.index-export', [
+                $data->organization->getKey(),
+                'format' => ExportFormat::PDF,
+                'start' => Carbon::now()->startOfYear()->toIso8601ZuluString(),
+                'end' => Carbon::now()->endOfYear()->toIso8601ZuluString(),
+                'debug' => 'true',
+            ]));
+
+            $response
+                ->assertConflict()
+                ->assertJsonPath('message', 'A PDF export is already in progress.');
+        } finally {
+            $lock->release();
+        }
     }
 
     public function test_index_export_endpoint_can_create_a_detailed_time_entry_report_in_format_csv_as_employee_role_with_show_billable_rate(): void

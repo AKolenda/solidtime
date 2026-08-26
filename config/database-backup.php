@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'connection' => env('DATABASE_BACKUP_CONNECTION'),
     'enabled' => env('DATABASE_BACKUP_ENABLED', false),
     'root_path' => env('DATABASE_BACKUP_ROOT_PATH', '/backups'),
     'time' => env('DATABASE_BACKUP_TIME', '02:00'),

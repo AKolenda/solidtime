@@ -33,6 +33,7 @@ use App\Service\LocalizationService;
 use App\Service\ReportExport\TimeEntriesDetailedCsvExport;
 use App\Service\ReportExport\TimeEntriesDetailedExport;
 use App\Service\ReportExport\TimeEntriesReportExport;
+use App\Service\ShopReport\ProjectReportSummary;
 use App\Service\TimeEntryAggregationService;
 use App\Service\TimeEntryFilter;
 use App\Service\TimeEntryService;
@@ -51,6 +52,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -239,105 +241,133 @@ class TimeEntryController extends Controller
             throw new FeatureIsNotAvailableInFreePlanApiException;
         }
         $user = $this->user();
-        $timezone = $user->timezone;
-        $showBillableRate = $this->member($organization)->role !== Role::Employee->value || $organization->employees_can_see_billable_rates;
-        $roundingType = $canAccessPremiumFeatures ? $request->getRoundingType() : null;
-        $roundingMinutes = $canAccessPremiumFeatures ? $request->getRoundingMinutes() : null;
-
-        $timeEntriesQuery = $this->getTimeEntriesQuery($organization, $request, $memberFilter, $canAccessPremiumFeatures);
-        $timeEntriesQuery->with([
-            'task',
-            'client',
-            'project',
-            'user',
-            'tagsRelation',
-        ]);
-        $filename = 'time-entries-export-'.now()->format('Y-m-d_H-i-s').'-'.Str::uuid().'.'.$format->getFileExtension();
-        $folderPath = 'exports';
-        $path = $folderPath.'/'.$filename;
-        $localizationService = LocalizationService::forOrganization($organization);
-        if ($format === ExportFormat::CSV) {
-            $export = new TimeEntriesDetailedCsvExport(config('filesystems.private'), $folderPath, $filename, $timeEntriesQuery, 1000, $timezone);
-            $export->export();
-        } elseif ($format === ExportFormat::PDF) {
-            if (config('services.gotenberg.url') === null && ! $debug) {
-                throw new PdfRendererIsNotConfiguredException;
-            }
-            $viewFile = file_get_contents(resource_path('views/reports/time-entry-index/pdf.blade.php'));
-            if ($viewFile === false) {
-                throw new \LogicException('View file not found');
-            }
-            $timeEntriesAggregateQuery = $this->getTimeEntriesAggregateQuery($organization, $request, $memberFilter);
-            $aggregatedData = $timeEntryAggregationService->getAggregatedTimeEntries(
-                $timeEntriesAggregateQuery,
-                null,
-                null,
-                $user->timezone,
-                $user->week_start,
-                false,
-                null,
-                null,
-                $showBillableRate,
-                $roundingType,
-                $roundingMinutes,
+        $pdfExportLock = null;
+        if ($format === ExportFormat::PDF) {
+            $pdfExportLock = Cache::lock(
+                'time-entry-pdf-export:'.$organization->getKey().':'.$user->getKey(),
+                300
             );
-            $html = Blade::render($viewFile, [
-                'timeEntries' => $timeEntriesQuery->get(),
-                'aggregatedData' => $aggregatedData,
-                'timezone' => $timezone,
-                'currency' => $organization->currency,
-                'start' => $request->getStart()->timezone($timezone),
-                'end' => $request->getEnd()->timezone($timezone),
-                'localization' => $localizationService,
-                'showBillableRate' => $showBillableRate,
-            ]);
-            $footerViewFile = file_get_contents(resource_path('views/reports/time-entry-index/pdf-footer.blade.php'));
-            if ($footerViewFile === false) {
-                throw new \LogicException('View file not found');
-            }
-            $footerHtml = Blade::render($footerViewFile);
-            if ($debug) {
+            if (! $pdfExportLock->get()) {
                 return response()->json([
-                    'html' => $html,
-                    'footer_html' => $footerHtml,
-                ]);
+                    'message' => 'A PDF export is already in progress.',
+                ], 409);
             }
-
-            $client = new Client([
-                'auth' => config('services.gotenberg.basic_auth_username') !== null && config('services.gotenberg.basic_auth_password') !== null ? [
-                    config('services.gotenberg.basic_auth_username'),
-                    config('services.gotenberg.basic_auth_password'),
-                ] : null,
-            ]);
-            $request = Gotenberg::chromium(config('services.gotenberg.url'))
-                ->pdf()
-                ->assets(
-                    Stream::path(resource_path('pdf/Outfit-VariableFont_wght.ttf'), 'outfit.ttf'),
-                )
-                ->margins(0.39, 0.78, 0.39, 0.39)
-                ->paperSize('8.27', '11.7') // A4
-                ->footer(Stream::string('footer', $footerHtml))
-                ->html(Stream::string('body', $html));
-            $tempFolder = TemporaryDirectory::make();
-            $filenameTemp = Gotenberg::save($request, $tempFolder->path(), $client);
-            Storage::disk(config('filesystems.private'))
-                ->putFileAs($folderPath, new File($tempFolder->path($filenameTemp)), $filename);
-        } else {
-            Excel::store(
-                new TimeEntriesDetailedExport($timeEntriesQuery, $format, $timezone, $localizationService),
-                $path,
-                config('filesystems.private'),
-                $format->getExportPackageType(),
-                [
-                    'visibility' => 'private',
-                ]
-            );
         }
 
-        return response()->json([
-            'download_url' => Storage::disk(config('filesystems.private'))
-                ->temporaryUrl($path, now()->addMinutes(5)),
-        ]);
+        try {
+            $timezone = $user->timezone;
+            $showBillableRate = $this->member($organization)->role !== Role::Employee->value || $organization->employees_can_see_billable_rates;
+            $roundingType = $canAccessPremiumFeatures ? $request->getRoundingType() : null;
+            $roundingMinutes = $canAccessPremiumFeatures ? $request->getRoundingMinutes() : null;
+
+            $timeEntriesQuery = $this->getTimeEntriesQuery($organization, $request, $memberFilter, $canAccessPremiumFeatures);
+            $timeEntriesQuery->with([
+                'task',
+                'client',
+                'project',
+                'user',
+                'tagsRelation',
+            ]);
+            $filename = 'time-entries-export-'.now()->format('Y-m-d_H-i-s').'-'.Str::uuid().'.'.$format->getFileExtension();
+            $folderPath = 'exports';
+            $path = $folderPath.'/'.$filename;
+            $localizationService = LocalizationService::forOrganization($organization);
+            if ($format === ExportFormat::CSV) {
+                $export = new TimeEntriesDetailedCsvExport(config('filesystems.private'), $folderPath, $filename, $timeEntriesQuery, 1000, $timezone);
+                $export->export();
+            } elseif ($format === ExportFormat::PDF) {
+                if (config('services.gotenberg.url') === null && ! $debug) {
+                    throw new PdfRendererIsNotConfiguredException;
+                }
+                $viewFile = file_get_contents(resource_path('views/reports/time-entry-index/pdf.blade.php'));
+                if ($viewFile === false) {
+                    throw new \LogicException('View file not found');
+                }
+                $timeEntries = $timeEntriesQuery->get();
+                $projectNames = $timeEntries->pluck('project.name')->filter()->unique()->values();
+                $shopReport = $organization->shop_report_enabled && $projectNames->count() === 1
+                    ? ProjectReportSummary::from((string) $projectNames->first(), $timeEntries)
+                    : null;
+                $aggregatedData = [];
+                if ($shopReport === null) {
+                    $timeEntriesAggregateQuery = $this->getTimeEntriesAggregateQuery($organization, $request, $memberFilter);
+                    $aggregatedData = $timeEntryAggregationService->getAggregatedTimeEntries(
+                        $timeEntriesAggregateQuery,
+                        null,
+                        null,
+                        $user->timezone,
+                        $user->week_start,
+                        false,
+                        null,
+                        null,
+                        $showBillableRate,
+                        $roundingType,
+                        $roundingMinutes,
+                    );
+                }
+                $html = Blade::render($viewFile, [
+                    'timeEntries' => $timeEntries,
+                    'aggregatedData' => $aggregatedData,
+                    'timezone' => $timezone,
+                    'currency' => $organization->currency,
+                    'start' => $request->getStart()->timezone($timezone),
+                    'end' => $request->getEnd()->timezone($timezone),
+                    'localization' => $localizationService,
+                    'showBillableRate' => $showBillableRate,
+                    'shopReport' => $shopReport,
+                    'shopReportLogo' => $organization->shop_report_logo,
+                    'shopReportOrganizationName' => $organization->name,
+                ]);
+                $footerViewFile = file_get_contents(resource_path('views/reports/time-entry-index/pdf-footer.blade.php'));
+                if ($footerViewFile === false) {
+                    throw new \LogicException('View file not found');
+                }
+                $footerHtml = Blade::render($footerViewFile);
+                if ($debug) {
+                    return response()->json([
+                        'html' => $html,
+                        'footer_html' => $footerHtml,
+                    ]);
+                }
+
+                $client = new Client([
+                    'auth' => config('services.gotenberg.basic_auth_username') !== null && config('services.gotenberg.basic_auth_password') !== null ? [
+                        config('services.gotenberg.basic_auth_username'),
+                        config('services.gotenberg.basic_auth_password'),
+                    ] : null,
+                ]);
+                $request = Gotenberg::chromium(config('services.gotenberg.url'))
+                    ->pdf()
+                    ->assets(
+                        Stream::path(resource_path('pdf/Outfit-VariableFont_wght.ttf'), 'outfit.ttf'),
+                    )
+                    ->margins(0.55, 0.55, 0.55, 0.55)
+                    ->paperSize('8.27', '11.7') // A4
+                    ->footer(Stream::string('footer', $footerHtml))
+                    ->html(Stream::string('body', $html));
+                $tempFolder = TemporaryDirectory::make();
+                $filenameTemp = Gotenberg::save($request, $tempFolder->path(), $client);
+                Storage::disk(config('filesystems.private'))
+                    ->putFileAs($folderPath, new File($tempFolder->path($filenameTemp)), $filename);
+            } else {
+                Excel::store(
+                    new TimeEntriesDetailedExport($timeEntriesQuery, $format, $timezone, $localizationService),
+                    $path,
+                    config('filesystems.private'),
+                    $format->getExportPackageType(),
+                    [
+                        'visibility' => 'private',
+                    ]
+                );
+            }
+
+            return response()->json([
+                'download_url' => Storage::disk(config('filesystems.private'))
+                    ->temporaryUrl($path, now()->addMinutes(5)),
+            ]);
+        } finally {
+            $pdfExportLock?->release();
+        }
     }
 
     /**

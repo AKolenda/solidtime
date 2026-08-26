@@ -378,6 +378,27 @@ class OrganizationEndpointTest extends ApiEndpointTestAbstract
         ]);
     }
 
+    public function test_update_endpoint_can_configure_shop_reports_and_logo(): void
+    {
+        $data = $this->createUserWithPermission(['organizations:update']);
+        $logo = 'data:image/png;base64,'.base64_encode('small-logo');
+        Passport::actingAs($data->user);
+
+        $response = $this->putJson(route('api.v1.organizations.update', [$data->organization->getKey()]), [
+            'shop_report_enabled' => true,
+            'shop_report_logo' => $logo,
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.shop_report_enabled', true)
+            ->assertJsonPath('data.shop_report_logo', $logo);
+        $this->assertDatabaseHas('organizations', [
+            'id' => $data->organization->getKey(),
+            'shop_report_enabled' => true,
+            'shop_report_logo' => $logo,
+        ]);
+    }
+
     public function test_show_endpoint_returns_breaks_enabled_setting_for_members_with_role_employee(): void
     {
         // Arrange

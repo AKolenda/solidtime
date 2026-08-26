@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\SelfHost;
 
+use App\Models\DatabaseBackupRun;
 use App\Service\SelfHost\DatabaseBackupConfiguration;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Process\ProcessResult;
@@ -23,9 +24,13 @@ class SelfHostDatabaseBackupCommand extends Command
         $destination = $configuration->destinationPath();
         $partialPath = null;
         $lock = null;
+        $run = DatabaseBackupRun::query()->create([
+            'status' => 'running',
+            'started_at' => now(),
+        ]);
 
         try {
-            $connection = config('database.default');
+            $connection = config('database-backup.connection') ?: config('database.default');
             $database = config("database.connections.{$connection}");
 
             if (! is_array($database) || ($database['driver'] ?? null) !== 'pgsql') {
@@ -77,6 +82,13 @@ class SelfHostDatabaseBackupCommand extends Command
             $partialPath = null;
 
             $this->removeExpiredBackups($destination, $configuration->retentionDays);
+            $run->update([
+                'status' => 'completed',
+                'filename' => $filename,
+                'size_bytes' => filesize($finalPath),
+                'validated' => true,
+                'finished_at' => now(),
+            ]);
             $this->info("Database backup created: {$finalPath} (".filesize($finalPath).' bytes)');
 
             return self::SUCCESS;
@@ -86,6 +98,11 @@ class SelfHostDatabaseBackupCommand extends Command
             }
 
             report($exception);
+            $run->update([
+                'status' => 'failed',
+                'error' => $exception->getMessage(),
+                'finished_at' => now(),
+            ]);
             $this->error('Database backup failed: '.$exception->getMessage());
 
             return self::FAILURE;

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Models\DatabaseBackupRun;
 use App\Models\DatabaseBackupSetting;
+use App\Service\SelfHost\DatabaseBackupConfiguration;
 use DateTimeZone;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -16,6 +18,8 @@ use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Carbon;
 
 class DatabaseBackups extends Page implements HasForms
 {
@@ -33,6 +37,32 @@ class DatabaseBackups extends Page implements HasForms
 
     /** @var array<string, mixed>|null */
     public ?array $data = [];
+
+    public function getLatestRun(): ?DatabaseBackupRun
+    {
+        return DatabaseBackupRun::query()->latest('started_at')->first();
+    }
+
+    /** @return Collection<int, DatabaseBackupRun> */
+    public function getRecentRuns(): Collection
+    {
+        return DatabaseBackupRun::query()->latest('started_at')->limit(10)->get();
+    }
+
+    public function getNextScheduledRun(): ?Carbon
+    {
+        $configuration = DatabaseBackupConfiguration::load();
+        if (! $configuration->enabled) {
+            return null;
+        }
+
+        $next = Carbon::today($configuration->timezone)->setTimeFromTimeString($configuration->time);
+        if ($next->isPast()) {
+            $next->addDay();
+        }
+
+        return $next;
+    }
 
     public function mount(): void
     {
