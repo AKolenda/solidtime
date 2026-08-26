@@ -82,7 +82,7 @@ export interface User {
     email: string;
     pending_email: string | null;
     email_verified_at: string | null;
-    is_super_admin?: boolean;
+    can_manage_database_backups?: boolean;
     password?: string;
     remember_token?: string | null;
     current_team_id: string | null;

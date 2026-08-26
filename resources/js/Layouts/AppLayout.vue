@@ -259,7 +259,7 @@ const page = usePage<{
                         </ul>
                     </nav>
                     <div
-                        v-if="canUpdateOrganization() || page.props.auth.user.is_super_admin"
+                        v-if="canUpdateOrganization() || page.props.auth.user.can_manage_database_backups"
                         class="text-text-tertiary text-xs font-semibold pt-5 pb-1.5">
                         Admin
                     </div>
@@ -294,10 +294,10 @@ const page = usePage<{
                                     )
                                 "></NavigationSidebarItem>
                             <NavigationSidebarItem
-                                v-if="page.props.auth.user.is_super_admin"
+                                v-if="page.props.auth.user.can_manage_database_backups"
                                 title="Database Backups"
                                 :icon="CircleStackIcon"
-                                href="/admin/database-backups"></NavigationSidebarItem>
+                                href="/backup-admin/database-backups"></NavigationSidebarItem>
                         </ul>
                     </nav>
                 </div>

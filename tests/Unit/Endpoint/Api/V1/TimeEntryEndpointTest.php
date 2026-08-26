@@ -1114,6 +1114,7 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $this->assertStringNotContainsString('<span>Total Running</span>', $html);
         $footerHtml = (string) $response->json('footer_html');
         $this->assertStringContainsString('class="shop-footer"', $footerHtml);
+        $this->assertStringContainsString('repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr)', $footerHtml);
         $this->assertStringContainsString('<span>Total Running</span>', $footerHtml);
         $this->assertStringContainsString('<span>Turning Setup</span>', $footerHtml);
         $this->assertStringContainsString('<span>Milling Setup</span>', $footerHtml);

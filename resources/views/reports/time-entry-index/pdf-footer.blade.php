@@ -15,7 +15,7 @@
                 font-size: 8px;
                 text-align: right;
             }
-            .shop-footer { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 0.35in; border-top: 1px solid #18181b; border-bottom: 1px solid #d4d4d8; background: #f8f8f8; }
+            .shop-footer { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr); margin: 0 0.35in; border-top: 1px solid #18181b; border-bottom: 1px solid #d4d4d8; background: #f8f8f8; }
             .shop-footer > div { padding: 5px 8px; border-right: 1px solid #d4d4d8; }
             .shop-footer > div:last-child { border-right: 0; }
             .shop-footer span { display: block; margin-bottom: 2px; color: #71717a; font-size: 7px; font-weight: 600; text-transform: uppercase; white-space: nowrap; }

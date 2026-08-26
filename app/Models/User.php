@@ -147,7 +147,23 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
 
     public function canAccessPanel(Panel $panel): bool
     {
+        if ($panel->getId() === 'backups') {
+            return $this->canManageDatabaseBackups();
+        }
+
         return in_array($this->email, config('auth.super_admins', []), true) && $this->hasVerifiedEmail();
+    }
+
+    public function canManageDatabaseBackups(): bool
+    {
+        if (! $this->hasVerifiedEmail() || $this->current_team_id === null) {
+            return false;
+        }
+
+        return $this->organizations()
+            ->whereKey($this->current_team_id)
+            ->wherePivotIn('role', [Role::Owner->value, Role::Admin->value])
+            ->exists();
     }
 
     public function isMemberOfOrganization(Organization $organization): bool

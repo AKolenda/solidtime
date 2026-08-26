@@ -9,7 +9,6 @@ use App\Http\Controllers\Web\OrganizationController;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Models\User;
-use Illuminate\Support\Facades\Config;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -71,17 +70,16 @@ class OrganizationEndpointTest extends EndpointTestAbstract
         );
     }
 
-    public function test_organization_show_identifies_a_verified_system_super_admin(): void
+    public function test_organization_show_identifies_an_organization_admin_who_can_manage_database_backups(): void
     {
-        $data = $this->createUserWithPermission(['organizations:view']);
-        Config::set('auth.super_admins', [$data->user->email]);
+        $data = $this->createUserWithRole(Role::Admin);
         $this->actingAs($data->user);
 
         $response = $this->get(route('organizations.show', [$data->organization->getKey()]));
 
         $response->assertOk();
         $response->assertInertia(fn (Assert $page) => $page
-            ->where('auth.user.is_super_admin', true)
+            ->where('auth.user.can_manage_database_backups', true)
         );
     }
 

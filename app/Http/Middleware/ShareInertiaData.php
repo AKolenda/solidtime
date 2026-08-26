@@ -42,7 +42,7 @@ class ShareInertiaData
                         'name' => $user->name,
                         'email' => $user->email,
                         'email_verified_at' => $user->email_verified_at,
-                        'is_super_admin' => in_array($user->email, config('auth.super_admins', []), true) && $user->hasVerifiedEmail(),
+                        'can_manage_database_backups' => $user->canManageDatabaseBackups(),
                         'current_team_id' => $user->current_team_id,
                         'profile_photo_path' => $user->profile_photo_path,
                         'timezone' => $user->timezone,
