@@ -1106,6 +1106,7 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $this->assertStringContainsString('<span>Total Running</span>', $html);
         $this->assertStringContainsString('<span>Combined Running Average Per Piece</span>', $html);
         $this->assertStringContainsString('Combined Turning + Milling running time divided by the total project quantity.', $html);
+        $this->assertStringContainsString('box-decoration-break: clone', $html);
         $this->assertStringNotContainsString('<th style="text-align: center;">Time</th>', $html);
     }
 

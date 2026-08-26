@@ -148,7 +148,7 @@
         .shop-table th, .shop-table td { border-right: 1px solid #94a3b8; }
         .shop-table th:last-child, .shop-table td:last-child { border-right: 0; }
         .shop-table thead { background: #f0f0f0; }
-        .operation-section { margin-top: 14px; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; page-break-inside: auto; }
+        .operation-section { margin-top: 14px; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; page-break-inside: auto; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
         .operation-header { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 13px; background: #fff; border-bottom: 1px solid #18181b; font-size: 14px; font-weight: 700; break-after: avoid; page-break-after: avoid; }
         .operation-total { font-size: 10px; font-weight: 600; }
         .operation-total span { margin-right: 6px; color: #71717a; font-size: 9px; text-transform: uppercase; letter-spacing: .035em; }
