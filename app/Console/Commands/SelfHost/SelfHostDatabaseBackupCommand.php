@@ -23,6 +23,7 @@ class SelfHostDatabaseBackupCommand extends Command
         $configuration = DatabaseBackupConfiguration::load();
         $destination = $configuration->destinationPath();
         $partialPath = null;
+        $archivePath = null;
         $lock = null;
         $run = DatabaseBackupRun::query()->create([
             'status' => 'running',
@@ -44,9 +45,11 @@ class SelfHostDatabaseBackupCommand extends Command
                 throw new RuntimeException('Another Solidtime database backup is already running.');
             }
 
-            $filename = 'solidtime-'.now()->format('Ymd-His').'.dump';
-            $finalPath = $destination.DIRECTORY_SEPARATOR.$filename;
-            $partialPath = $finalPath.'.partial';
+            $basename = 'solidtime-'.now()->format('Ymd-His');
+            $archiveFinalPath = $destination.DIRECTORY_SEPARATOR.$basename.'.dump';
+            $sqlFinalPath = $destination.DIRECTORY_SEPARATOR.$basename.'.sql';
+            $archivePath = $archiveFinalPath.'.partial';
+            $partialPath = $sqlFinalPath.'.partial';
             $environment = ['PGPASSWORD' => (string) ($database['password'] ?? '')];
 
             if (! empty($database['sslmode'])) {
@@ -64,37 +67,74 @@ class SelfHostDatabaseBackupCommand extends Command
                     '--format=custom',
                     '--no-owner',
                     '--no-privileges',
-                    '--file='.$partialPath,
+                    '--file='.$archivePath,
                 ]);
             $this->ensureProcessSucceeded($dump, 'pg_dump');
 
-            if (! is_file($partialPath) || filesize($partialPath) === 0) {
+            if (! is_file($archivePath) || filesize($archivePath) === 0) {
                 throw new RuntimeException('pg_dump completed without producing a backup file.');
             }
 
             $validation = Process::timeout($configuration->timeoutSeconds)
-                ->run(['pg_restore', '--list', $partialPath]);
+                ->run(['pg_restore', '--list', $archivePath]);
             $this->ensureProcessSucceeded($validation, 'pg_restore validation');
 
-            if (! rename($partialPath, $finalPath)) {
-                throw new RuntimeException('Could not finalize the database backup.');
+            if (in_array($configuration->outputFormat, ['sql', 'both'], true)) {
+                $conversion = Process::timeout($configuration->timeoutSeconds)
+                    ->run([
+                        'pg_restore',
+                        '--clean',
+                        '--if-exists',
+                        '--no-owner',
+                        '--no-privileges',
+                        '--file='.$partialPath,
+                        $archivePath,
+                    ]);
+                $this->ensureProcessSucceeded($conversion, 'pg_restore SQL conversion');
+
+                if (! is_file($partialPath) || filesize($partialPath) === 0) {
+                    throw new RuntimeException('pg_restore completed without producing a SQL backup file.');
+                }
+
+                if (! rename($partialPath, $sqlFinalPath)) {
+                    throw new RuntimeException('Could not finalize the SQL database backup.');
+                }
+                $partialPath = null;
             }
-            $partialPath = null;
+
+            if (in_array($configuration->outputFormat, ['dump', 'both'], true)) {
+                if (! rename($archivePath, $archiveFinalPath)) {
+                    throw new RuntimeException('Could not finalize the archive database backup.');
+                }
+            } else {
+                @unlink($archivePath);
+            }
+            $archivePath = null;
+
+            $createdPaths = array_values(array_filter([
+                in_array($configuration->outputFormat, ['dump', 'both'], true) ? $archiveFinalPath : null,
+                in_array($configuration->outputFormat, ['sql', 'both'], true) ? $sqlFinalPath : null,
+            ]));
+            $filenames = array_map('basename', $createdPaths);
+            $size = array_sum(array_map(fn (string $path): int => (int) filesize($path), $createdPaths));
 
             $this->removeExpiredBackups($destination, $configuration->retentionDays);
             $run->update([
                 'status' => 'completed',
-                'filename' => $filename,
-                'size_bytes' => filesize($finalPath),
+                'filename' => implode(', ', $filenames),
+                'size_bytes' => $size,
                 'validated' => true,
                 'finished_at' => now(),
             ]);
-            $this->info("Database backup created: {$finalPath} (".filesize($finalPath).' bytes)');
+            $this->info('Database backup created: '.implode(', ', $createdPaths)." ({$size} bytes)");
 
             return self::SUCCESS;
         } catch (Throwable $exception) {
             if ($partialPath !== null && is_file($partialPath)) {
                 @unlink($partialPath);
+            }
+            if ($archivePath !== null && is_file($archivePath)) {
+                @unlink($archivePath);
             }
 
             report($exception);
@@ -135,7 +175,10 @@ class SelfHostDatabaseBackupCommand extends Command
     private function removeExpiredBackups(string $destination, int $retentionDays): void
     {
         $cutoff = now()->subDays($retentionDays)->getTimestamp();
-        $backups = glob($destination.DIRECTORY_SEPARATOR.'solidtime-????????-??????.dump') ?: [];
+        $backups = array_merge(
+            glob($destination.DIRECTORY_SEPARATOR.'solidtime-????????-??????.sql') ?: [],
+            glob($destination.DIRECTORY_SEPARATOR.'solidtime-????????-??????.dump') ?: [],
+        );
 
         foreach ($backups as $backup) {
             $modifiedAt = filemtime($backup);

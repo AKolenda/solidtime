@@ -297,7 +297,8 @@ const page = usePage<{
                                 v-if="page.props.auth.user.can_manage_database_backups"
                                 title="Database Backups"
                                 :icon="CircleStackIcon"
-                                href="/backup-admin/database-backups"></NavigationSidebarItem>
+                                :current="route().current('database-backups.show')"
+                                :href="route('database-backups.show')"></NavigationSidebarItem>
                         </ul>
                     </nav>
                 </div>

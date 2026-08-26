@@ -15,6 +15,8 @@ class DatabaseBackupSetting extends Model
         'timezone',
         'retention_days',
         'subdirectory',
+        'root_path',
+        'output_format',
     ];
 
     /** @var array<string, string> */

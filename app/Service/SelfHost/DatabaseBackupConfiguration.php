@@ -17,6 +17,7 @@ final readonly class DatabaseBackupConfiguration
         public int $retentionDays,
         public string $subdirectory,
         public string $rootPath,
+        public string $outputFormat,
         public int $timeoutSeconds,
     ) {}
 
@@ -38,7 +39,8 @@ final readonly class DatabaseBackupConfiguration
             timezone: $stored?->timezone ?? (string) config('database-backup.timezone'),
             retentionDays: $stored?->retention_days ?? (int) config('database-backup.retention_days'),
             subdirectory: $stored?->subdirectory ?? '',
-            rootPath: rtrim((string) config('database-backup.root_path'), DIRECTORY_SEPARATOR),
+            rootPath: rtrim($stored?->root_path ?? (string) config('database-backup.root_path'), DIRECTORY_SEPARATOR),
+            outputFormat: $stored?->output_format ?? 'sql',
             timeoutSeconds: (int) config('database-backup.timeout_seconds'),
         );
     }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DatabaseBackupController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\OrganizationController;
 use App\Http\Controllers\Web\OrganizationInvitationController;
@@ -94,6 +95,13 @@ Route::middleware([
     Route::get('/import', function () {
         return Inertia::render('Import');
     })->name('import');
+
+    Route::get('/database-backups', [DatabaseBackupController::class, 'show'])
+        ->name('database-backups.show');
+    Route::put('/database-backups', [DatabaseBackupController::class, 'update'])
+        ->name('database-backups.update');
+    Route::post('/database-backups/restore', [DatabaseBackupController::class, 'restore'])
+        ->name('database-backups.restore');
 
     Route::get('/organizations/create', [OrganizationController::class, 'create'])->name('organizations.create');
     Route::get('/organizations/{organizationId}', [OrganizationController::class, 'show'])->name('organizations.show');
