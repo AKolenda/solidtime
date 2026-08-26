@@ -128,7 +128,7 @@
         .document-name { font-size: 11px; color: #52525b; margin-bottom: 8px; }
         .shop-logo-wrap { flex: 0 0 auto; padding: 3px 8px 3px 12px; }
         .shop-logo { display: block; max-width: 198px; max-height: 55px; object-fit: contain; }
-        .meta-grid { background: #fff; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; margin-bottom: 16px; width: 100%; }
+        .meta-grid { background: #fff; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; margin-bottom: 10px; width: 100%; }
         .meta-grid thead { background: #f0f0f0; }
         .meta-grid th, .meta-grid td { border-right: 1px solid #d4d4d8; padding: 8px 12px; }
         .meta-grid th:last-child, .meta-grid td:last-child { border-right: 0; }
@@ -136,12 +136,12 @@
         .meta-grid td { color: #3f3f46; font-size: 10px; }
         .meta-label { color: #71717a; font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
         .meta-value { font-size: 11px; font-weight: 600; }
-        .summary-sheet { border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; margin-bottom: 16px; }
+        .summary-sheet { border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; margin-bottom: 8px; }
         .summary-sheet table { width: 100%; }
         .summary-sheet th, .summary-sheet td { border-right: 1px solid #d4d4d8; padding: 7px 9px; }
         .summary-sheet th:last-child, .summary-sheet td:last-child { border-right: 0; }
-        .summary-sheet th { background: #f0f0f0; font-size: 10px; font-weight: 600; }
-        .summary-sheet td { font-size: 10px; }
+        .summary-sheet th { background: #f0f0f0; color: #18181b; font-family: 'Outfit', 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 600; }
+        .summary-sheet td { color: #18181b; font-family: 'Outfit', 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 500; }
         .summary-sheet td:not(:first-child) { text-align: right; white-space: nowrap; }
         .summary-sheet .operation-name { font-size: 11px; font-weight: 700; }
         .summary-sheet .task-heading td { background: #f0f0f0; font-weight: 600; }
@@ -153,7 +153,7 @@
         .shop-table thead { background: #f0f0f0; }
         .shop-table thead tr:last-child th { background: #f0f0f0; color: #18181b; font-size: 10px; font-weight: 600; }
         .shop-table tbody td { color: #3f3f46; font-size: 10px; }
-        .operation-section { margin-top: 14px; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; page-break-inside: auto; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+        .operation-section { margin-top: 0; margin-bottom: 10px; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; page-break-inside: auto; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
         .operation-header-row th { padding: 9px 13px; background: #fff; border-bottom: 1px solid #18181b; }
         .operation-header { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 700; }
         .operation-total { font-size: 10px; font-weight: 600; }

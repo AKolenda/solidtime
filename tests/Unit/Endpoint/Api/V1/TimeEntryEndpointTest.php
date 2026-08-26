@@ -1119,6 +1119,9 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $this->assertStringContainsString('<span>Milling Setup</span>', $footerHtml);
         $this->assertStringContainsString('<span>Combined Run Avg / Piece</span>', $footerHtml);
         $this->assertStringContainsString('<th>Task totals</th><th>Total</th><th>Running average per piece</th>', $html);
+        $this->assertStringContainsString('.summary-sheet { border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; margin-bottom: 8px; }', $html);
+        $this->assertStringContainsString(".summary-sheet td { color: #18181b; font-family: 'Outfit', 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10px; font-weight: 500; }", $html);
+        $this->assertStringContainsString('.operation-section { margin-top: 0; margin-bottom: 10px;', $html);
         $this->assertStringNotContainsString('<th>Operation</th>', $html);
         $this->assertStringContainsString('box-decoration-break: clone', $html);
         $this->assertStringNotContainsString('<th style="text-align: center;">Time</th>', $html);

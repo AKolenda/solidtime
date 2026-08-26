@@ -9,6 +9,7 @@ use App\Http\Controllers\Web\OrganizationController;
 use App\Models\Organization;
 use App\Models\OrganizationInvitation;
 use App\Models\User;
+use Illuminate\Support\Facades\Config;
 use Inertia\Testing\AssertableInertia as Assert;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -67,6 +68,20 @@ class OrganizationEndpointTest extends EndpointTestAbstract
             ->where('team.owner.name', $data->owner->name)
             ->has('team.owner.profile_photo_url')
             ->has('currencies')
+        );
+    }
+
+    public function test_organization_show_identifies_a_verified_system_super_admin(): void
+    {
+        $data = $this->createUserWithPermission(['organizations:view']);
+        Config::set('auth.super_admins', [$data->user->email]);
+        $this->actingAs($data->user);
+
+        $response = $this->get(route('organizations.show', [$data->organization->getKey()]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('auth.user.is_super_admin', true)
         );
     }
 

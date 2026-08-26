@@ -6,6 +6,7 @@ import CurrentSidebarTimer from '@/Components/CurrentSidebarTimer.vue';
 import {
     CalendarIcon,
     ChartBarIcon,
+    CircleStackIcon,
     ClockIcon,
     Cog6ToothIcon,
     CreditCardIcon,
@@ -258,7 +259,7 @@ const page = usePage<{
                         </ul>
                     </nav>
                     <div
-                        v-if="canUpdateOrganization()"
+                        v-if="canUpdateOrganization() || page.props.auth.user.is_super_admin"
                         class="text-text-tertiary text-xs font-semibold pt-5 pb-1.5">
                         Admin
                     </div>
@@ -292,6 +293,11 @@ const page = usePage<{
                                         page.props.auth.user.current_team.id
                                     )
                                 "></NavigationSidebarItem>
+                            <NavigationSidebarItem
+                                v-if="page.props.auth.user.is_super_admin"
+                                title="Database Backups"
+                                :icon="CircleStackIcon"
+                                href="/admin/database-backups"></NavigationSidebarItem>
                         </ul>
                     </nav>
                 </div>
