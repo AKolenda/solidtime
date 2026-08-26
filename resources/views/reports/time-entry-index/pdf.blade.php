@@ -145,18 +145,23 @@
         .summary-sheet .task-heading td { background: #f0f0f0; font-weight: 600; }
         .summary-sheet .task-name { text-align: left; }
         .summary-sheet .task-total { font-weight: 600; text-align: right; }
+        .shop-table { table-layout: fixed; width: 100%; }
         .shop-table th, .shop-table td { border-right: 1px solid #94a3b8; }
         .shop-table th:last-child, .shop-table td:last-child { border-right: 0; }
         .shop-table thead { background: #f0f0f0; }
         .operation-section { margin-top: 14px; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; page-break-inside: auto; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
-        .operation-header { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 13px; background: #fff; border-bottom: 1px solid #18181b; font-size: 14px; font-weight: 700; break-after: avoid; page-break-after: avoid; }
+        .operation-header-row th { padding: 9px 13px; background: #fff; border-bottom: 1px solid #18181b; }
+        .operation-header { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; font-weight: 700; }
         .operation-total { font-size: 10px; font-weight: 600; }
         .operation-total span { margin-right: 6px; color: #71717a; font-size: 9px; text-transform: uppercase; letter-spacing: .035em; }
         .shop-table thead { display: table-header-group; }
         .shop-table tr { break-inside: avoid; page-break-inside: avoid; }
         .activity-label { display: block; margin-bottom: 3px; color: #475569; font-size: 9px; font-weight: 650; text-transform: uppercase; letter-spacing: .035em; }
-        .user-name { font-weight: 500; white-space: nowrap; }
+        .user-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; white-space: nowrap; }
+        .user-name { min-width: 0; font-weight: 500; white-space: nowrap; }
+        .user-date { flex: none; color: #71717a; font-size: 8px; font-weight: 400; }
         .user-time { margin-top: 3px; color: #71717a; font-size: 9px; white-space: nowrap; }
+        .machine-tags { overflow: hidden; font-size: 8px; line-height: 1.15; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
         .report-total-row { display: flex; justify-content: space-between; margin-top: 14px; padding: 10px 13px; border-top: 1px solid #18181b; border-bottom: 1px solid #d4d4d8; background: #f8f8f8; }
         .report-total-row > div { display: flex; align-items: baseline; gap: 8px; }
         .report-total-row span { font-size: 10px; font-weight: 700; text-transform: uppercase; }
@@ -235,26 +240,34 @@
     @foreach($operationGroups as $operationName => $operationEntries)
         @php($operationTotalSeconds = $operationEntries->sum(fn ($entry) => (int) $entry->getDuration()->totalSeconds))
         <div class="operation-section">
-            <div class="operation-header">
-                <div>{{ $operationName }}</div>
-                <div class="operation-total"><span>Total time</span>{{ $quarterHours($operationTotalSeconds) }}</div>
-            </div>
             <table class="shop-table" style="width: 100%;">
                 <colgroup>
-                    <col style="width: 23%;">
+                    <col style="width: 25%;">
                     <col style="width: 9%;">
-                    <col style="width: 60%;">
-                    <col style="width: 8%;">
+                    <col style="width: 55%;">
+                    <col style="width: 11%;">
                 </colgroup>
-                <thead><tr><th>User</th><th>Duration</th><th>Notes</th><th>Tags</th></tr></thead>
+                <thead>
+                    <tr class="operation-header-row">
+                        <th colspan="4">
+                            <div class="operation-header">
+                                <div>{{ $operationName }}</div>
+                                <div class="operation-total"><span>Total time</span>{{ $quarterHours($operationTotalSeconds) }}</div>
+                            </div>
+                        </th>
+                    </tr>
+                    <tr><th>User</th><th>Duration</th><th>Notes</th><th>Tags</th></tr>
+                </thead>
                 <tbody>
                 @foreach($operationEntries as $timeEntry)
                     @php($activity = trim(explode(' - ', $timeEntry->task?->name ?? '', 2)[1] ?? ''))
                     <tr>
                         <td>
-                            <div class="user-name">{{ $timeEntry->user->name }}</div>
+                            <div class="user-heading">
+                                <span class="user-name">{{ $timeEntry->user->name }}</span>
+                                <span class="user-date">{{ $timeEntry->start->timezone($timezone)->format('m-d') }}</span>
+                            </div>
                             <div class="user-time">
-                                {{ $timeEntry->start->timezone($timezone)->format('m-d') }} &nbsp;|&nbsp;
                                 {{ $localization->formatTime($timeEntry->start->timezone($timezone)) }} - {{ $localization->formatTime($timeEntry->end->timezone($timezone)) }}
                             </div>
                         </td>
@@ -263,7 +276,7 @@
                             @if($activity !== '')<span class="activity-label">{{ $activity }}</span>@endif
                             {{ filled($timeEntry->description) ? $timeEntry->description : '-' }}
                         </td>
-                        <td style="overflow-wrap: break-word;">{{ count($timeEntry->tagsRelation) === 0 ? '-' : $timeEntry->tagsRelation->implode('name', ', ') }}</td>
+                        <td class="machine-tags">{{ count($timeEntry->tagsRelation) === 0 ? '-' : $timeEntry->tagsRelation->implode('name', ', ') }}</td>
                     </tr>
                 @endforeach
                 </tbody>

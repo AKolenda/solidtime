@@ -336,12 +336,13 @@ class TimeEntryController extends Controller
                         config('services.gotenberg.basic_auth_password'),
                     ] : null,
                 ]);
+                $pdfMargin = $shopReport !== null ? 0.35 : 0.55;
                 $request = Gotenberg::chromium(config('services.gotenberg.url'))
                     ->pdf()
                     ->assets(
                         Stream::path(resource_path('pdf/Outfit-VariableFont_wght.ttf'), 'outfit.ttf'),
                     )
-                    ->margins(0.55, 0.55, 0.55, 0.55)
+                    ->margins($pdfMargin, $pdfMargin, $pdfMargin, $pdfMargin)
                     ->paperSize('8.27', '11.7') // A4
                     ->footer(Stream::string('footer', $footerHtml))
                     ->html(Stream::string('body', $html));

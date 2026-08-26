@@ -1101,7 +1101,12 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $this->assertStringContainsString('Project 639893 - 47321 - 10pcs - QT18.00 - QM6.00', $html);
         $this->assertStringContainsString('<th>Operation</th>', $html);
         $this->assertStringContainsString('<th>User</th><th>Duration</th><th>Notes</th><th>Tags</th>', $html);
+        $this->assertStringContainsString('class="user-heading"', $html);
+        $this->assertStringContainsString('class="operation-header-row"', $html);
+        $this->assertStringContainsString('class="user-date"', $html);
         $this->assertStringContainsString('class="user-time"', $html);
+        $this->assertStringContainsString('class="machine-tags"', $html);
+        $this->assertStringContainsString('table-layout: fixed', $html);
         $this->assertStringContainsString('<span>Total time</span>', $html);
         $this->assertStringContainsString('<span>Total Running</span>', $html);
         $this->assertStringContainsString('<span>Combined Running Average Per Piece</span>', $html);
