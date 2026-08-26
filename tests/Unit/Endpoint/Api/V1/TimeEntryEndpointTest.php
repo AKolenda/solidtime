@@ -1111,13 +1111,15 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $this->assertStringContainsString('padding: 3px 8px 3px 12px', $html);
         $this->assertStringContainsString('max-width: 198px', $html);
         $this->assertStringContainsString('<span>Total time</span>', $html);
-        $this->assertStringContainsString('<span>Total Running</span>', $html);
-        $this->assertStringContainsString('<span>Turning Setup</span>', $html);
-        $this->assertStringContainsString('<span>Milling Setup</span>', $html);
-        $this->assertStringContainsString('<span>Combined Running Average Per Piece</span>', $html);
+        $this->assertStringNotContainsString('<span>Total Running</span>', $html);
+        $footerHtml = (string) $response->json('footer_html');
+        $this->assertStringContainsString('class="shop-footer"', $footerHtml);
+        $this->assertStringContainsString('<span>Total Running</span>', $footerHtml);
+        $this->assertStringContainsString('<span>Turning Setup</span>', $footerHtml);
+        $this->assertStringContainsString('<span>Milling Setup</span>', $footerHtml);
+        $this->assertStringContainsString('<span>Combined Run Avg / Piece</span>', $footerHtml);
         $this->assertStringContainsString('<th>Task totals</th><th>Total</th><th>Running average per piece</th>', $html);
         $this->assertStringNotContainsString('<th>Operation</th>', $html);
-        $this->assertStringContainsString('Combined Turning + Milling running time divided by the total project quantity.', $html);
         $this->assertStringContainsString('box-decoration-break: clone', $html);
         $this->assertStringNotContainsString('<th style="text-align: center;">Time</th>', $html);
     }

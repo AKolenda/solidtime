@@ -166,12 +166,6 @@
         .user-date { flex: none; color: #71717a; font-size: 8px; font-weight: 400; }
         .user-time { margin-top: 3px; color: #71717a; font-size: 9px; white-space: nowrap; }
         .machine-tags { overflow: hidden; font-size: 8px; line-height: 1.15; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
-        .report-total-row { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 14px; border-top: 1px solid #18181b; border-bottom: 1px solid #d4d4d8; background: #f8f8f8; }
-        .report-total-row > div { padding: 9px 11px; border-right: 1px solid #d4d4d8; }
-        .report-total-row > div:last-child { border-right: 0; }
-        .report-total-row span { display: block; margin-bottom: 4px; color: #71717a; font-size: 8px; font-weight: 600; text-transform: uppercase; }
-        .report-total-row strong { display: block; font-size: 12px; }
-        .report-total-footnote { margin: 5px 13px 0; color: #71717a; font-size: 8px; }
 
     </style>
 </head>
@@ -336,19 +330,6 @@
     </div>
 </div>
 @endif
-
-@if($shopReport && $shopReport->runningSeconds !== null && $shopReport->totalQuantity !== null)
-    @php($turningOperation = collect($shopReport->operations)->firstWhere('name', 'Turning'))
-    @php($millingOperation = collect($shopReport->operations)->firstWhere('name', 'Milling'))
-    <div class="report-total-row">
-        <div><span>Total Running</span><strong>{{ $quarterHours($shopReport->runningSeconds) }}</strong></div>
-        <div><span>Turning Setup</span><strong>{{ $quarterHours($turningOperation['setup_seconds'] ?? 0) }}</strong></div>
-        <div><span>Milling Setup</span><strong>{{ $quarterHours($millingOperation['setup_seconds'] ?? 0) }}</strong></div>
-        <div><span>Combined Running Average Per Piece</span><strong>{{ $quarterHours($shopReport->runningSeconds / $shopReport->totalQuantity) }}</strong></div>
-    </div>
-    <p class="report-total-footnote">* Combined Turning + Milling running time divided by the total project quantity.</p>
-@endif
-
 
 </body>
 </html>

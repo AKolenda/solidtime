@@ -322,7 +322,9 @@ class TimeEntryController extends Controller
                 if ($footerViewFile === false) {
                     throw new \LogicException('View file not found');
                 }
-                $footerHtml = Blade::render($footerViewFile);
+                $footerHtml = Blade::render($footerViewFile, [
+                    'shopReport' => $shopReport,
+                ]);
                 if ($debug) {
                     return response()->json([
                         'html' => $html,
@@ -337,12 +339,13 @@ class TimeEntryController extends Controller
                     ] : null,
                 ]);
                 $pdfMargin = $shopReport !== null ? 0.35 : 0.55;
+                $pdfBottomMargin = $shopReport !== null ? 0.82 : 0.55;
                 $request = Gotenberg::chromium(config('services.gotenberg.url'))
                     ->pdf()
                     ->assets(
                         Stream::path(resource_path('pdf/Outfit-VariableFont_wght.ttf'), 'outfit.ttf'),
                     )
-                    ->margins($pdfMargin, $pdfMargin, $pdfMargin, $pdfMargin)
+                    ->margins($pdfMargin, $pdfBottomMargin, $pdfMargin, $pdfMargin)
                     ->paperSize('8.27', '11.7') // A4
                     ->footer(Stream::string('footer', $footerHtml))
                     ->html(Stream::string('body', $html));
