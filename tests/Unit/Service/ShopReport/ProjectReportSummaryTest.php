@@ -37,5 +37,9 @@ class ProjectReportSummaryTest extends TestCase
         $this->assertSame(3600, $summary->operations[0]['setup_seconds']);
         $this->assertSame(9000, $summary->operations[0]['running_seconds']);
         $this->assertSame(600.0, $summary->operations[0]['seconds_per_piece']);
+        $this->assertSame('Turning - Programming, Setup and F/O', $summary->taskTotals[0]['name']);
+        $this->assertNull($summary->taskTotals[0]['seconds_per_piece']);
+        $this->assertSame('Turning - Running', $summary->taskTotals[1]['name']);
+        $this->assertSame(600.0, $summary->taskTotals[1]['seconds_per_piece']);
     }
 }

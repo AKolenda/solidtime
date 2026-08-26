@@ -166,10 +166,11 @@
         .user-date { flex: none; color: #71717a; font-size: 8px; font-weight: 400; }
         .user-time { margin-top: 3px; color: #71717a; font-size: 9px; white-space: nowrap; }
         .machine-tags { overflow: hidden; font-size: 8px; line-height: 1.15; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
-        .report-total-row { display: flex; justify-content: space-between; margin-top: 14px; padding: 10px 13px; border-top: 1px solid #18181b; border-bottom: 1px solid #d4d4d8; background: #f8f8f8; }
-        .report-total-row > div { display: flex; align-items: baseline; gap: 8px; }
-        .report-total-row span { font-size: 10px; font-weight: 700; text-transform: uppercase; }
-        .report-total-row strong { font-size: 14px; }
+        .report-total-row { display: grid; grid-template-columns: repeat(4, 1fr); margin-top: 14px; border-top: 1px solid #18181b; border-bottom: 1px solid #d4d4d8; background: #f8f8f8; }
+        .report-total-row > div { padding: 9px 11px; border-right: 1px solid #d4d4d8; }
+        .report-total-row > div:last-child { border-right: 0; }
+        .report-total-row span { display: block; margin-bottom: 4px; color: #71717a; font-size: 8px; font-weight: 600; text-transform: uppercase; }
+        .report-total-row strong { display: block; font-size: 12px; }
         .report-total-footnote { margin: 5px 13px 0; color: #71717a; font-size: 8px; }
 
     </style>
@@ -208,24 +209,14 @@
 <div class="summary-sheet">
     <table>
         <thead>
-            <tr><th>Operation</th><th>Setup / programming</th><th>Running total</th><th>Running per piece</th><th>Total</th><th>AVG</th></tr>
+            <tr><th>Task totals</th><th>Total</th><th>Running average per piece</th></tr>
         </thead>
         <tbody>
-        @foreach($shopReport->operations as $operation)
-            <tr>
-                <td class="operation-name">{{ $operation['name'] }}</td>
-                <td>{{ $quarterHours($operation['setup_seconds']) }}</td>
-                <td>{{ $quarterHours($operation['running_seconds']) }}</td>
-                <td>{{ $operation['seconds_per_piece'] !== null ? $quarterHours($operation['seconds_per_piece']).' x '.($shopReport->totalQuantity + 0) : '-' }}</td>
-                <td><strong>{{ $quarterHours($operation['setup_seconds'] + $operation['running_seconds']) }}</strong></td>
-                <td><strong>{{ $operation['seconds_per_piece'] !== null ? $quarterHours($operation['seconds_per_piece']) : '-' }}</strong></td>
-            </tr>
-        @endforeach
-            <tr class="task-heading"><td colspan="5">Task totals</td><td>Total</td></tr>
         @foreach($shopReport->taskTotals as $task)
             <tr>
-                <td class="task-name" colspan="5">{{ $task['name'] }}</td>
+                <td class="task-name">{{ $task['name'] }}</td>
                 <td class="task-total">{{ $quarterHours($task['seconds']) }}</td>
+                <td class="task-total">{{ $task['seconds_per_piece'] !== null ? $quarterHours($task['seconds_per_piece']) : '-' }}</td>
             </tr>
         @endforeach
         </tbody>
@@ -347,8 +338,12 @@
 @endif
 
 @if($shopReport && $shopReport->runningSeconds !== null && $shopReport->totalQuantity !== null)
+    @php($turningOperation = collect($shopReport->operations)->firstWhere('name', 'Turning'))
+    @php($millingOperation = collect($shopReport->operations)->firstWhere('name', 'Milling'))
     <div class="report-total-row">
         <div><span>Total Running</span><strong>{{ $quarterHours($shopReport->runningSeconds) }}</strong></div>
+        <div><span>Turning Setup</span><strong>{{ $quarterHours($turningOperation['setup_seconds'] ?? 0) }}</strong></div>
+        <div><span>Milling Setup</span><strong>{{ $quarterHours($millingOperation['setup_seconds'] ?? 0) }}</strong></div>
         <div><span>Combined Running Average Per Piece</span><strong>{{ $quarterHours($shopReport->runningSeconds / $shopReport->totalQuantity) }}</strong></div>
     </div>
     <p class="report-total-footnote">* Combined Turning + Milling running time divided by the total project quantity.</p>

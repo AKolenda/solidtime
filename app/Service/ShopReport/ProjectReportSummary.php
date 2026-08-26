@@ -11,7 +11,7 @@ final readonly class ProjectReportSummary
 {
     /**
      * @param  list<array{part: string, quantity: float|null, turning: float|null, milling: float|null}>  $parts
-     * @param  list<array{name: string, seconds: int}>  $taskTotals
+     * @param  list<array{name: string, seconds: int, seconds_per_piece: float|null}>  $taskTotals
      * @param  list<array{name: string, setup_seconds: int, running_seconds: int, seconds_per_piece: float|null}>  $operations
      */
     public function __construct(
@@ -44,20 +44,32 @@ final readonly class ProjectReportSummary
             ];
         }
 
+        $totalQuantity = array_sum(array_filter(array_column($parts, 'quantity'), fn ($value): bool => $value !== null));
         $taskTotals = $timeEntries
             ->groupBy(fn (TimeEntry $entry): string => $entry->task?->name ?? 'No task')
-            ->map(fn (Collection $entries, string $name): array => [
-                'name' => $name,
-                'seconds' => (int) $entries->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds),
-            ])
-            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->map(function (Collection $entries, string $name) use ($totalQuantity): array {
+                $seconds = (int) $entries->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds);
+                $isRunning = str_contains(strtolower($name), 'running');
+
+                return [
+                    'name' => $name,
+                    'seconds' => $seconds,
+                    'seconds_per_piece' => $isRunning && $totalQuantity > 0 ? $seconds / $totalQuantity : null,
+                ];
+            })
+            ->sortBy(function (array $task): string {
+                $name = strtolower($task['name']);
+                $operationOrder = str_starts_with($name, 'turning') ? 0 : (str_starts_with($name, 'milling') ? 1 : 2);
+                $taskOrder = str_contains($name, 'running') ? 1 : 0;
+
+                return sprintf('%d-%d-%s', $operationOrder, $taskOrder, $name);
+            })
             ->values()
             ->all();
 
         $runningSeconds = (int) $timeEntries
             ->filter(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task?->name ?? ''), 'running'))
             ->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds);
-        $totalQuantity = array_sum(array_filter(array_column($parts, 'quantity'), fn ($value): bool => $value !== null));
         $operations = collect(['Turning', 'Milling'])->map(function (string $operation) use ($timeEntries, $totalQuantity): array {
             $matching = $timeEntries->filter(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task?->name ?? ''), strtolower($operation)));
             $running = (int) $matching
