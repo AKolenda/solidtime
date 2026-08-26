@@ -126,8 +126,8 @@
         .shop-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #18181b; }
         .company-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
         .document-name { font-size: 11px; color: #52525b; margin-bottom: 8px; }
-        .shop-logo-wrap { padding: 3px 0 3px 12px; }
-        .shop-logo { display: block; max-width: 210px; max-height: 55px; object-fit: contain; }
+        .shop-logo-wrap { flex: 0 0 auto; padding: 3px 8px 3px 12px; }
+        .shop-logo { display: block; max-width: 198px; max-height: 55px; object-fit: contain; }
         .meta-grid { background: #fff; border: 1px solid #d4d4d8; border-radius: 5px; overflow: hidden; margin-bottom: 16px; width: 100%; }
         .meta-grid thead { background: #f0f0f0; }
         .meta-grid th, .meta-grid td { border-right: 1px solid #d4d4d8; padding: 8px 12px; }

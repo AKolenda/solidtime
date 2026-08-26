@@ -1109,6 +1109,8 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $this->assertStringContainsString('table-layout: fixed', $html);
         $this->assertStringContainsString('border-right: 1px solid #d4d4d8', $html);
         $this->assertStringContainsString('.meta-value { font-size: 11px', $html);
+        $this->assertStringContainsString('padding: 3px 8px 3px 12px', $html);
+        $this->assertStringContainsString('max-width: 198px', $html);
         $this->assertStringContainsString('<span>Total time</span>', $html);
         $this->assertStringContainsString('<span>Total Running</span>', $html);
         $this->assertStringContainsString('<span>Combined Running Average Per Piece</span>', $html);
