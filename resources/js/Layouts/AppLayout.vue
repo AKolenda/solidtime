@@ -259,7 +259,10 @@ const page = usePage<{
                         </ul>
                     </nav>
                     <div
-                        v-if="canUpdateOrganization() || page.props.auth.user.can_manage_database_backups"
+                        v-if="
+                            canUpdateOrganization() ||
+                            page.props.auth.user.can_manage_database_backups
+                        "
                         class="text-text-tertiary text-xs font-semibold pt-5 pb-1.5">
                         Admin
                     </div>
@@ -330,16 +333,21 @@ const page = usePage<{
             <div
                 class="h-screen overflow-y-auto flex flex-col bg-default-background border-l border-default-background-separator">
                 <div
-                    class="lg:hidden w-full px-3 py-1 border-b border-b-default-background-separator text-text-secondary flex justify-between items-center">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        class="h-7 w-7 shrink-0"
-                        @click="openSidebar">
-                        <PanelLeft class="h-4 w-4 text-icon-default" />
-                    </Button>
-                    <div class="flex items-center gap-1">
+                    class="lg:hidden w-full px-3 py-1 border-b border-b-default-background-separator text-text-secondary grid grid-cols-[1fr_auto_1fr] items-center">
+                    <div class="justify-self-start">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Open sidebar"
+                            class="h-7 w-7 shrink-0"
+                            @click="openSidebar">
+                            <PanelLeft class="h-4 w-4 text-icon-default" />
+                        </Button>
+                    </div>
+                    <div class="w-48 min-w-0 sm:w-64">
                         <OrganizationSwitcher></OrganizationSwitcher>
+                    </div>
+                    <div class="justify-self-end">
                         <Button
                             variant="ghost"
                             size="icon"
@@ -348,7 +356,6 @@ const page = usePage<{
                             @click="openPalette">
                             <MagnifyingGlassIcon class="h-4 w-4 text-icon-default" />
                         </Button>
-                        <UserSettingsIcon test-id="current_user_button_mobile"></UserSettingsIcon>
                     </div>
                 </div>
 

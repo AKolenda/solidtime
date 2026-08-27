@@ -546,6 +546,23 @@ test.describe('Organization Create, Delete & Switch', () => {
         await expect(orgSwitcher).not.toContainText(orgName, { timeout: 10000 });
         await expect(orgSwitcher).toContainText(previousOrgName, { timeout: 10000 });
     });
+
+    test('mobile header centers the organization switcher and keeps the user menu in the sidebar', async ({
+        page,
+    }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.goto(PLAYWRIGHT_BASE_URL + '/dashboard');
+
+        await expect(page.getByTestId('current_user_button_mobile')).toHaveCount(0);
+
+        const organizationSwitcher = page.locator('[data-testid="organization_switcher"]:visible');
+        const switcherBox = await organizationSwitcher.boundingBox();
+        expect(switcherBox).not.toBeNull();
+        expect(Math.abs(switcherBox!.x + switcherBox!.width / 2 - 195)).toBeLessThanOrEqual(2);
+
+        await page.getByRole('button', { name: 'Open sidebar' }).click();
+        await expect(page.getByTestId('current_user_button')).toBeVisible();
+    });
 });
 
 // =============================================
