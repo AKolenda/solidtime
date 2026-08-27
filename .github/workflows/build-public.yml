@@ -25,6 +25,7 @@ env:
 name: Build - Public
 jobs:
   build:
+    if: github.repository == 'solidtime-io/solidtime'
     strategy:
       matrix:
         include:
@@ -164,6 +165,7 @@ jobs:
           retention-days: 1
 
   merge:
+    if: github.repository == 'solidtime-io/solidtime'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     needs:

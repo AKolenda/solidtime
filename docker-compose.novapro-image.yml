@@ -1,0 +1,10 @@
+# Apply this override after the existing production Compose file.
+# SOLIDTIME_IMAGE can pin a tested revision, for example:
+# ghcr.io/akolenda/solidtime:sha-586293b
+services:
+    app:
+        image: '${SOLIDTIME_IMAGE:-ghcr.io/akolenda/solidtime:latest}'
+        pull_policy: always
+    scheduler:
+        image: '${SOLIDTIME_IMAGE:-ghcr.io/akolenda/solidtime:latest}'
+        pull_policy: always
