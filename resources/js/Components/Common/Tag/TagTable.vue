@@ -2,7 +2,7 @@
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import { FolderPlusIcon } from '@heroicons/vue/24/solid';
 import { PlusIcon } from '@heroicons/vue/16/solid';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useTagsQuery } from '@/utils/useTagsQuery';
 import TagTableRow from '@/Components/Common/Tag/TagTableRow.vue';
 import TagCreateModal from '@/packages/ui/src/Tag/TagCreateModal.vue';
@@ -10,13 +10,14 @@ import TagTableHeading from '@/Components/Common/Tag/TagTableHeading.vue';
 import { canCreateTags } from '@/utils/permissions';
 import type { Tag } from '@/packages/api/src';
 import {
-    useSortableTable,
-    type SortableColumnDef,
-    type SortDirection,
-} from '@/utils/useSortableTable';
+    useVueTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    type SortingState,
+} from '@tanstack/vue-table';
 
 export type SortColumn = 'name';
-export type { SortDirection } from '@/utils/useSortableTable';
+export type SortDirection = 'asc' | 'desc';
 
 const props = defineProps<{
     createTag: (name: string) => Promise<Tag | undefined>;
@@ -31,27 +32,50 @@ const emit = defineEmits<{
 const { tags } = useTagsQuery();
 const showCreateTagModal = ref(false);
 
-const columns: SortableColumnDef<Tag, SortColumn>[] = [
+const sorting = computed<SortingState>(() => [
+    {
+        id: props.sortColumn,
+        desc: props.sortDirection === 'desc',
+    },
+]);
+
+const columns = [
     {
         id: 'name',
         accessorFn: (row: Tag) => row.name.toLowerCase(),
     },
 ];
 
-const {
-    sortedRows: sortedTags,
-    descFirstColumns,
-    nextDirection,
-} = useSortableTable({
-    data: () => tags.value,
-    columns: () => columns,
-    sortColumn: () => props.sortColumn,
-    sortDirection: () => props.sortDirection,
-});
+const descFirstColumns = new Set<SortColumn>(
+    columns.filter((c) => 'sortDescFirst' in c && c.sortDescFirst).map((c) => c.id as SortColumn)
+);
 
 function handleSort(column: SortColumn) {
-    emit('sort', column, nextDirection(column));
+    if (props.sortColumn === column) {
+        emit('sort', column, props.sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+        emit('sort', column, descFirstColumns.has(column) ? 'desc' : 'asc');
+    }
 }
+
+const table = useVueTable({
+    get data() {
+        return tags.value;
+    },
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    state: {
+        get sorting() {
+            return sorting.value;
+        },
+    },
+    manualSorting: false,
+});
+
+const sortedTags = computed(() => {
+    return table.getRowModel().rows.map((row) => row.original);
+});
 </script>
 
 <template>

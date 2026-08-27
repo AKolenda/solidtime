@@ -8,7 +8,7 @@ import {
     createProjectViaApi,
     createPublicProjectViaApi,
 } from './utils/api';
-import { clearTableState, getTableRowNames } from './utils/table';
+import { getTableRowNames } from './utils/table';
 
 async function goToClientsOverview(page: Page) {
     await page.goto(PLAYWRIGHT_BASE_URL + '/clients');
@@ -210,12 +210,18 @@ test('test that client context menu delete deletes the client', async ({ page, c
 // Sorting Tests
 // =============================================
 
+async function clearClientTableState(page: Page) {
+    await page.evaluate(() => {
+        localStorage.removeItem('client-table-state');
+    });
+}
+
 test('test that sorting clients by name and status works', async ({ page, ctx }) => {
     await createClientViaApi(ctx, { name: 'AAA SortClient' });
     await createClientViaApi(ctx, { name: 'ZZZ SortClient' });
 
     await goToClientsOverview(page);
-    await clearTableState(page, 'client-table-state');
+    await clearClientTableState(page);
     await page.reload();
 
     const table = page.getByTestId('client_table');
@@ -247,7 +253,7 @@ test('test that sorting clients by project count works', async ({ page, ctx }) =
     await createProjectViaApi(ctx, { name: 'Proj2', client_id: clientWithMany.id });
 
     await goToClientsOverview(page);
-    await clearTableState(page, 'client-table-state');
+    await clearClientTableState(page);
     await page.reload();
 
     const table = page.getByTestId('client_table');
@@ -268,7 +274,7 @@ test('test that sorting clients by project count works', async ({ page, ctx }) =
 
 test('test that client sort state persists after page reload', async ({ page }) => {
     await goToClientsOverview(page);
-    await clearTableState(page, 'client-table-state');
+    await clearClientTableState(page);
     await page.reload();
 
     const table = page.getByTestId('client_table');
@@ -391,7 +397,7 @@ test.describe('Clients Pagination', () => {
         );
 
         await goToClientsOverview(page);
-        await clearTableState(page, 'client-table-state');
+        await clearClientTableState(page);
         await page.reload();
 
         // Default sort is name asc; first 15 clients (00–14) on page 1.
@@ -444,7 +450,7 @@ test.describe('Clients Pagination', () => {
         );
 
         await goToClientsOverview(page);
-        await clearTableState(page, 'client-table-state');
+        await clearClientTableState(page);
         await page.reload();
 
         await expect(page.getByTestId('client_table')).toBeVisible();
@@ -464,7 +470,7 @@ test.describe('Clients Pagination', () => {
         );
 
         await goToClientsOverview(page);
-        await clearTableState(page, 'client-table-state');
+        await clearClientTableState(page);
         await page.reload();
 
         await expect(page.getByText(prefix + '00')).toBeVisible({ timeout: 10000 });

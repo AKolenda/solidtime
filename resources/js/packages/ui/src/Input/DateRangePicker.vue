@@ -21,8 +21,6 @@ const weekStartsOn = computed((): WeekStartDay => firstDayIndex.value as WeekSta
 const props = defineProps<{
     start: string;
     end: string;
-    class?: string;
-    dataTestid?: string;
 }>();
 
 const emit = defineEmits<{
@@ -153,13 +151,11 @@ watch(open, (value) => {
     <Popover v-model:open="open">
         <PopoverTrigger as-child>
             <Button
-                :data-testid="props.dataTestid"
                 variant="outline"
                 :class="
                     twMerge(
                         'flex w-full items-center justify-between whitespace-nowrap h-[34px] text-start',
-                        !modelValue && 'text-muted-foreground',
-                        props.class
+                        !modelValue && 'text-muted-foreground'
                     )
                 ">
                 <CalendarIcon class="-ml-0.5 text-text-quaternary h-4 w-4" />

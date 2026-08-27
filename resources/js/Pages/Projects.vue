@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import AppLayout from '@/Layouts/AppLayout.vue';
 import MainContainer from '@/packages/ui/src/MainContainer.vue';
+import AppLayout from '@/Layouts/AppLayout.vue';
 import { PlusIcon } from '@heroicons/vue/20/solid';
 import { Search } from '@lucide/vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
@@ -25,7 +25,6 @@ import { getCurrentOrganizationId, getCurrentRole } from '@/utils/useUser';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { useStorage } from '@vueuse/core';
-import { useTableSortState } from '@/utils/useTableSortState';
 import ProjectsFilterDropdown from '@/Components/Common/Project/ProjectsFilterDropdown.vue';
 import ProjectStatusFilterBadge from '@/Components/Common/Project/ProjectStatusFilterBadge.vue';
 import ProjectVisibilityFilterBadge from '@/Components/Common/Project/ProjectVisibilityFilterBadge.vue';
@@ -43,7 +42,7 @@ import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/tim
 import DateRangePicker from '@/packages/ui/src/Input/DateRangePicker.vue';
 
 // Fetch data using TanStack Query
-const { projects, isLoading: projectsLoading } = useProjectsQuery();
+const { projects } = useProjectsQuery();
 const { clients } = useClientsQuery();
 const { tasks } = useTasksQuery();
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
@@ -62,7 +61,7 @@ interface ProjectTableState {
     };
 }
 
-const { tableState, handleSort } = useTableSortState<SortColumn, ProjectTableState>(
+const tableState = useStorage<ProjectTableState>(
     'project-table-state-v2',
     {
         sortColumn: 'name',
@@ -73,14 +72,20 @@ const { tableState, handleSort } = useTableSortState<SortColumn, ProjectTableSta
             visibility: 'all',
         },
     },
-    // The filters are merged key by key so a stored value missing a newer filter still
-    // picks up its default instead of the whole object falling back.
-    (storage, defaults) => ({
-        ...defaults,
-        ...storage,
-        filters: { ...defaults.filters, ...storage.filters },
-    })
+    undefined,
+    {
+        mergeDefaults: (storage, defaults) => ({
+            ...defaults,
+            ...storage,
+            filters: { ...defaults.filters, ...storage.filters },
+        }),
+    }
 );
+
+function handleSort(column: SortColumn, direction: SortDirection) {
+    tableState.value.sortColumn = column;
+    tableState.value.sortDirection = direction;
+}
 
 // Keep each organization's search when navigating into a project and back.
 const search = useStorage(`project-search-${getCurrentOrganizationId() ?? 'default'}`, '');
@@ -178,15 +183,6 @@ const filteredProjects = computed(() => {
 
         return true;
     });
-});
-
-const hasActiveFilters = computed(() => {
-    return (
-        search.value.trim() !== '' ||
-        tableState.value.filters.status !== 'all' ||
-        tableState.value.filters.visibility !== 'all' ||
-        tableState.value.filters.clientIds.length > 0
-    );
 });
 
 // Helper functions for active filters
@@ -342,6 +338,7 @@ async function exportDetailedPdf() {
                     @remove="removeClientFilter"
                     @update:value="tableState.filters.clientIds = $event as string[]" />
 
+                <!-- Pushed to the right edge, aligned with the filter/search row -->
                 <SecondaryButton
                     v-if="canCreateProjects()"
                     :icon="PlusIcon"
@@ -363,8 +360,6 @@ async function exportDetailedPdf() {
 
         <ProjectTable
             :show-billable-rate="showBillableRate"
-            :is-filtered="hasActiveFilters"
-            :is-loading="projectsLoading"
             :projects="filteredProjects"
             :sort-column="tableState.sortColumn"
             :sort-direction="tableState.sortDirection"
