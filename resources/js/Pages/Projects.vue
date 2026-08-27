@@ -286,7 +286,9 @@ async function exportDetailedPdf() {
             <strong>PDF Reports</strong> are only available in solidtime Professional.
         </UpgradeModal>
         <MainContainer class="py-3 sm:pt-5">
-            <div class="flex flex-wrap items-center gap-2 py-1">
+            <div
+                data-testid="project_toolbar"
+                class="flex flex-nowrap items-center gap-2 overflow-x-auto py-1">
                 <ProjectsFilterDropdown
                     :filters="tableState.filters"
                     :clients="sortedClients"
@@ -305,11 +307,9 @@ async function exportDetailedPdf() {
                         class="w-60 border-transparent bg-transparent pl-7 shadow-none placeholder:text-text-tertiary hover:bg-black/5 focus-visible:bg-input-background dark:hover:bg-white/5 [&::-webkit-search-cancel-button]:hidden" />
                 </div>
 
-                <DateRangePicker
-                    v-model:start="filterStartDate"
-                    v-model:end="filterEndDate"
-                    data-testid="project_date_filter"
-                    class="w-72 shrink-0" />
+                <div data-testid="project_date_filter" class="w-72 shrink-0">
+                    <DateRangePicker v-model:start="filterStartDate" v-model:end="filterEndDate" />
+                </div>
 
                 <!-- Active Filters -->
                 <ProjectStatusFilterBadge
@@ -342,7 +342,7 @@ async function exportDetailedPdf() {
                 <SecondaryButton
                     v-if="canCreateProjects()"
                     :icon="PlusIcon"
-                    class="ml-auto"
+                    class="ml-auto shrink-0"
                     @click="showCreateProjectModal = true"
                     >Create Project
                 </SecondaryButton>

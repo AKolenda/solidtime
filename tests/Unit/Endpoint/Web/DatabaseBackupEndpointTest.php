@@ -31,8 +31,55 @@ class DatabaseBackupEndpointTest extends EndpointTestAbstract
                 ->has('timezones', fn (Assert $timezones) => $timezones
                     ->where('0', 'Africa/Abidjan')
                     ->etc())
+                ->where('backupDirectory.path', '/backups')
+                ->has('backupFiles')
                 ->has('runs')
             );
+    }
+
+    public function test_backup_page_lists_only_completed_backup_files_from_the_destination(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $directory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'solidtime-backups-'.bin2hex(random_bytes(6));
+        mkdir($directory);
+
+        try {
+            $older = $directory.DIRECTORY_SEPARATOR.'solidtime-20260826-020000.dump';
+            $newer = $directory.DIRECTORY_SEPARATOR.'solidtime-20260827-020000.sql';
+            file_put_contents($older, 'archive');
+            file_put_contents($newer, '-- PostgreSQL database dump');
+            file_put_contents($directory.DIRECTORY_SEPARATOR.'solidtime-20260827-020000.sql.partial', 'partial');
+            file_put_contents($directory.DIRECTORY_SEPARATOR.'notes.txt', 'unrelated');
+            touch($older, 1_000);
+            touch($newer, 2_000);
+
+            DatabaseBackupSetting::query()->create([
+                'enabled' => true,
+                'root_path' => $directory,
+                'subdirectory' => '',
+                'time' => '02:00',
+                'timezone' => 'America/Edmonton',
+                'retention_days' => 30,
+                'output_format' => 'both',
+            ]);
+
+            $this->actingAs($data->user)
+                ->get(route('database-backups.show'))
+                ->assertOk()
+                ->assertInertia(fn (Assert $page) => $page
+                    ->where('backupDirectory.path', $directory)
+                    ->where('backupDirectory.exists', true)
+                    ->where('backupDirectory.readable', true)
+                    ->has('backupFiles', 2)
+                    ->where('backupFiles.0.name', basename($newer))
+                    ->where('backupFiles.1.name', basename($older))
+                );
+        } finally {
+            foreach (glob($directory.DIRECTORY_SEPARATOR.'*') ?: [] as $path) {
+                unlink($path);
+            }
+            rmdir($directory);
+        }
     }
 
     public function test_employee_cannot_open_the_backup_page(): void

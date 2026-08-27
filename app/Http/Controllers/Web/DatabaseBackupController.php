@@ -38,6 +38,8 @@ class DatabaseBackupController extends Controller
                 'output_format' => $configuration->outputFormat,
             ],
             'timezones' => DateTimeZone::listIdentifiers(),
+            'backupDirectory' => $this->backupDirectory($configuration),
+            'backupFiles' => $this->backupFiles($configuration),
             'runs' => $runs->map(fn (DatabaseBackupRun $run): array => [
                 'id' => $run->id,
                 'status' => $run->status,
@@ -49,6 +51,54 @@ class DatabaseBackupController extends Controller
                 'finished_at' => $run->finished_at?->toIso8601String(),
             ])->all(),
         ]);
+    }
+
+    /** @return array{path: string, exists: bool, readable: bool, writable: bool} */
+    private function backupDirectory(DatabaseBackupConfiguration $configuration): array
+    {
+        $path = $configuration->destinationPath();
+
+        return [
+            'path' => $path,
+            'exists' => is_dir($path),
+            'readable' => is_dir($path) && is_readable($path),
+            'writable' => is_dir($path) && is_writable($path),
+        ];
+    }
+
+    /** @return list<array{name: string, size_bytes: int, modified_at: string}> */
+    private function backupFiles(DatabaseBackupConfiguration $configuration): array
+    {
+        $directory = $configuration->destinationPath();
+        if (! is_dir($directory) || ! is_readable($directory)) {
+            return [];
+        }
+
+        $files = [];
+        foreach (['dump', 'sql'] as $extension) {
+            $matches = glob($directory.DIRECTORY_SEPARATOR.'solidtime-????????-??????.'.$extension);
+            foreach ($matches === false ? [] : $matches as $path) {
+                if (! is_file($path) || is_link($path)) {
+                    continue;
+                }
+
+                $modifiedAt = filemtime($path);
+                $size = filesize($path);
+                if ($modifiedAt === false || $size === false) {
+                    continue;
+                }
+
+                $files[] = [
+                    'name' => basename($path),
+                    'size_bytes' => $size,
+                    'modified_at' => date(DATE_ATOM, $modifiedAt),
+                ];
+            }
+        }
+
+        usort($files, fn (array $left, array $right): int => strcmp($right['modified_at'], $left['modified_at']));
+
+        return array_slice($files, 0, 500);
     }
 
     public function update(Request $request): RedirectResponse

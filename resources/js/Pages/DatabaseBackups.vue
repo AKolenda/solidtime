@@ -10,7 +10,7 @@ import InputLabel from '@/packages/ui/src/Input/InputLabel.vue';
 import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/packages/ui/src';
 import { CircleStackIcon } from '@heroicons/vue/16/solid';
-import { DocumentArrowUpIcon } from '@heroicons/vue/24/outline';
+import { DocumentArrowUpIcon, FolderOpenIcon } from '@heroicons/vue/24/outline';
 import { computed } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
@@ -35,7 +35,26 @@ type BackupRun = {
     finished_at: string | null;
 };
 
-const props = defineProps<{ settings: Settings; timezones: string[]; runs: BackupRun[] }>();
+type BackupDirectory = {
+    path: string;
+    exists: boolean;
+    readable: boolean;
+    writable: boolean;
+};
+
+type BackupFile = {
+    name: string;
+    size_bytes: number;
+    modified_at: string;
+};
+
+const props = defineProps<{
+    settings: Settings;
+    timezones: string[];
+    runs: BackupRun[];
+    backupDirectory: BackupDirectory;
+    backupFiles: BackupFile[];
+}>();
 const form = useForm({ ...props.settings });
 const restoreForm = useForm<{ backup: File | null; confirmation: string }>({
     backup: null,
@@ -80,7 +99,7 @@ function formatDate(value: string | null) {
 
         <MainContainer class="py-6">
             <div class="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
-                <section>
+                <section class="space-y-6">
                     <div class="mb-2 text-sm font-medium">Backup schedule</div>
                     <Card>
                         <form class="p-5 space-y-5" @submit.prevent="save">
@@ -197,6 +216,87 @@ function formatDate(value: string | null) {
                             </div>
                         </form>
                     </Card>
+
+                    <div>
+                        <div class="mb-2 flex items-center justify-between gap-4">
+                            <span class="text-sm font-medium">Backup files</span>
+                            <span
+                                class="truncate text-xs text-text-secondary"
+                                :title="backupDirectory.path">
+                                {{ backupDirectory.path }}
+                            </span>
+                        </div>
+                        <Card>
+                            <div
+                                class="flex items-start gap-3 border-b border-default-background-separator p-4">
+                                <FolderOpenIcon
+                                    class="mt-0.5 h-5 w-5 shrink-0 text-text-secondary" />
+                                <div class="min-w-0 flex-1">
+                                    <div
+                                        class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                                        <span class="font-medium">Mounted backup folder</span>
+                                        <span
+                                            :class="
+                                                backupDirectory.exists &&
+                                                backupDirectory.readable &&
+                                                backupDirectory.writable
+                                                    ? 'text-green-600 dark:text-green-400'
+                                                    : 'text-red-600 dark:text-red-400'
+                                            ">
+                                            {{
+                                                backupDirectory.exists &&
+                                                backupDirectory.readable &&
+                                                backupDirectory.writable
+                                                    ? 'Ready'
+                                                    : 'Unavailable'
+                                            }}
+                                        </span>
+                                    </div>
+                                    <p class="mt-1 break-all text-sm text-text-secondary">
+                                        {{ backupDirectory.path }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div v-if="backupFiles.length > 0" class="overflow-x-auto">
+                                <table class="w-full text-left text-sm">
+                                    <thead
+                                        class="border-b border-default-background-separator bg-secondary text-text-secondary">
+                                        <tr>
+                                            <th class="px-4 py-2.5 font-medium">File</th>
+                                            <th class="px-4 py-2.5 font-medium">Modified</th>
+                                            <th class="px-4 py-2.5 text-right font-medium">Size</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-default-background-separator">
+                                        <tr v-for="file in backupFiles" :key="file.name">
+                                            <td class="max-w-0 px-4 py-3">
+                                                <div
+                                                    class="truncate font-medium"
+                                                    :title="file.name">
+                                                    {{ file.name }}
+                                                </div>
+                                            </td>
+                                            <td
+                                                class="whitespace-nowrap px-4 py-3 text-text-secondary">
+                                                {{ formatDate(file.modified_at) }}
+                                            </td>
+                                            <td class="whitespace-nowrap px-4 py-3 text-right">
+                                                {{ formatSize(file.size_bytes) }}
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div v-else class="p-8 text-center">
+                                <FolderOpenIcon class="mx-auto h-8 w-8 text-text-tertiary" />
+                                <p class="mt-3 text-sm font-medium">No backup files found</p>
+                                <p class="mt-1 text-sm text-text-secondary">
+                                    Valid Solidtime .dump and .sql files will appear here.
+                                </p>
+                            </div>
+                        </Card>
+                    </div>
                 </section>
 
                 <section class="space-y-6">

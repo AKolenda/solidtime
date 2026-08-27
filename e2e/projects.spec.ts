@@ -1235,3 +1235,28 @@ test('test that searching projects by name works', async ({ page, ctx }) => {
     await expect(page.getByText(matchingProjectName)).toBeVisible();
     await expect(page.getByText(otherProjectName)).toBeVisible();
 });
+
+test('project search, date, and filters stay on one toolbar row', async ({ page }) => {
+    await goToProjectsOverview(page);
+
+    const searchBox = page.getByTestId('project_search');
+    const dateFilter = page.getByTestId('project_date_filter');
+    const statusFilter = page.getByTestId('status-filter-badge');
+    await expect(searchBox).toBeVisible();
+    await expect(dateFilter).toBeVisible();
+    await expect(statusFilter).toBeVisible();
+
+    const [searchBounds, dateBounds, statusBounds] = await Promise.all([
+        searchBox.boundingBox(),
+        dateFilter.boundingBox(),
+        statusFilter.boundingBox(),
+    ]);
+
+    expect(searchBounds).not.toBeNull();
+    expect(dateBounds).not.toBeNull();
+    expect(statusBounds).not.toBeNull();
+    const centerY = (bounds: { y: number; height: number }) => bounds.y + bounds.height / 2;
+    expect(Math.abs(centerY(searchBounds!) - centerY(dateBounds!))).toBeLessThanOrEqual(2);
+    expect(Math.abs(centerY(dateBounds!) - centerY(statusBounds!))).toBeLessThanOrEqual(2);
+    expect(dateBounds!.width).toBeLessThan(400);
+});
