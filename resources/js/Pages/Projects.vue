@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
+import MainContainer from '@/packages/ui/src/MainContainer.vue';
 import { PlusIcon } from '@heroicons/vue/20/solid';
+import { Search } from '@lucide/vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
 import ProjectTable from '@/Components/Common/Project/ProjectTable.vue';
 import { computed, ref } from 'vue';
@@ -24,6 +25,7 @@ import { getCurrentOrganizationId, getCurrentRole } from '@/utils/useUser';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { useStorage } from '@vueuse/core';
+import { useTableSortState } from '@/utils/useTableSortState';
 import ProjectsFilterDropdown from '@/Components/Common/Project/ProjectsFilterDropdown.vue';
 import ProjectStatusFilterBadge from '@/Components/Common/Project/ProjectStatusFilterBadge.vue';
 import ProjectVisibilityFilterBadge from '@/Components/Common/Project/ProjectVisibilityFilterBadge.vue';
@@ -41,7 +43,7 @@ import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/tim
 import DateRangePicker from '@/packages/ui/src/Input/DateRangePicker.vue';
 
 // Fetch data using TanStack Query
-const { projects } = useProjectsQuery();
+const { projects, isLoading: projectsLoading } = useProjectsQuery();
 const { clients } = useClientsQuery();
 const { tasks } = useTasksQuery();
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
@@ -60,7 +62,7 @@ interface ProjectTableState {
     };
 }
 
-const tableState = useStorage<ProjectTableState>(
+const { tableState, handleSort } = useTableSortState<SortColumn, ProjectTableState>(
     'project-table-state-v2',
     {
         sortColumn: 'name',
@@ -71,20 +73,14 @@ const tableState = useStorage<ProjectTableState>(
             visibility: 'all',
         },
     },
-    undefined,
-    {
-        mergeDefaults: (storage, defaults) => ({
-            ...defaults,
-            ...storage,
-            filters: { ...defaults.filters, ...storage.filters },
-        }),
-    }
+    // The filters are merged key by key so a stored value missing a newer filter still
+    // picks up its default instead of the whole object falling back.
+    (storage, defaults) => ({
+        ...defaults,
+        ...storage,
+        filters: { ...defaults.filters, ...storage.filters },
+    })
 );
-
-function handleSort(column: SortColumn, direction: SortDirection) {
-    tableState.value.sortColumn = column;
-    tableState.value.sortDirection = direction;
-}
 
 // Keep each organization's search when navigating into a project and back.
 const search = useStorage(`project-search-${getCurrentOrganizationId() ?? 'default'}`, '');
@@ -182,6 +178,15 @@ const filteredProjects = computed(() => {
 
         return true;
     });
+});
+
+const hasActiveFilters = computed(() => {
+    return (
+        search.value.trim() !== '' ||
+        tableState.value.filters.status !== 'all' ||
+        tableState.value.filters.visibility !== 'all' ||
+        tableState.value.filters.clientIds.length > 0
+    );
 });
 
 // Helper functions for active filters
@@ -291,15 +296,24 @@ async function exportDetailedPdf() {
                     :clients="sortedClients"
                     @update:filters="tableState.filters = $event" />
 
-                <!-- Same style as the dropdown search inputs, see MultiselectDropdown.vue -->
-                <TextInput
-                    v-model="search"
-                    type="search"
-                    data-testid="project_search"
-                    placeholder="Search projects, clients, tasks..."
-                    class="w-60 h-8" />
+                <div class="relative shrink-0">
+                    <Search
+                        class="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-icon-default" />
+                    <TextInput
+                        v-model="search"
+                        size="sm"
+                        type="search"
+                        aria-label="Search projects"
+                        data-testid="project_search"
+                        placeholder="Search projects, clients, tasks..."
+                        class="w-60 border-transparent bg-transparent pl-7 shadow-none placeholder:text-text-tertiary hover:bg-black/5 focus-visible:bg-input-background dark:hover:bg-white/5 [&::-webkit-search-cancel-button]:hidden" />
+                </div>
 
-                <DateRangePicker v-model:start="filterStartDate" v-model:end="filterEndDate" />
+                <DateRangePicker
+                    v-model:start="filterStartDate"
+                    v-model:end="filterEndDate"
+                    data-testid="project_date_filter"
+                    class="w-72 shrink-0" />
 
                 <!-- Active Filters -->
                 <ProjectStatusFilterBadge
@@ -328,7 +342,6 @@ async function exportDetailedPdf() {
                     @remove="removeClientFilter"
                     @update:value="tableState.filters.clientIds = $event as string[]" />
 
-                <!-- Pushed to the right edge, aligned with the filter/search row -->
                 <SecondaryButton
                     v-if="canCreateProjects()"
                     :icon="PlusIcon"
@@ -350,6 +363,8 @@ async function exportDetailedPdf() {
 
         <ProjectTable
             :show-billable-rate="showBillableRate"
+            :is-filtered="hasActiveFilters"
+            :is-loading="projectsLoading"
             :projects="filteredProjects"
             :sort-column="tableState.sortColumn"
             :sort-direction="tableState.sortDirection"
