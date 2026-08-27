@@ -2,8 +2,13 @@ name: Build - NovaPro Image
 
 on:
     push:
-        branches:
-            - main
+    branches:
+      - main
+    paths-ignore:
+      - '.github/**'
+      - 'docs/**'
+      - '*.md'
+      - 'docker-compose*.yml'
     workflow_dispatch:
 
 concurrency:
