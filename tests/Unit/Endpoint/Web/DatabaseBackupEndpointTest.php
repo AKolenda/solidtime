@@ -32,6 +32,7 @@ class DatabaseBackupEndpointTest extends EndpointTestAbstract
                     ->where('0', 'Africa/Abidjan')
                     ->etc())
                 ->where('backupDirectory.path', '/backups/solidtime_backups')
+                ->has('detectedDirectories')
                 ->has('backupFiles')
                 ->has('runs')
             );

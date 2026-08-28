@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DatabaseBackupRun;
 use App\Models\DatabaseBackupSetting;
 use App\Service\SelfHost\DatabaseBackupConfiguration;
+use App\Service\SelfHost\DatabaseBackupMountDiscovery;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ use Inertia\Response;
 
 class DatabaseBackupController extends Controller
 {
-    public function show(Request $request): Response
+    public function show(Request $request, DatabaseBackupMountDiscovery $mountDiscovery): Response
     {
         abort_unless($request->user()?->canManageDatabaseBackups(), 403);
 
@@ -39,6 +40,7 @@ class DatabaseBackupController extends Controller
             ],
             'timezones' => DateTimeZone::listIdentifiers(),
             'backupDirectory' => $this->backupDirectory($configuration),
+            'detectedDirectories' => $mountDiscovery->discover($configuration->destinationPath()),
             'backupFiles' => $this->backupFiles($configuration),
             'runs' => $runs->map(fn (DatabaseBackupRun $run): array => [
                 'id' => $run->id,

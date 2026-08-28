@@ -11,7 +11,7 @@ import TextInput from '@/packages/ui/src/Input/TextInput.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/packages/ui/src';
 import { CircleStackIcon } from '@heroicons/vue/16/solid';
 import { DocumentArrowUpIcon, FolderOpenIcon } from '@heroicons/vue/24/outline';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 
 type Settings = {
@@ -51,14 +51,46 @@ type BackupFile = {
     modified_at: string;
 };
 
+type DetectedDirectory = {
+    path: string;
+    mount_path: string;
+    recommended: boolean;
+};
+
 const props = defineProps<{
     settings: Settings;
     timezones: string[];
     runs: BackupRun[];
     backupDirectory: BackupDirectory;
     backupFiles: BackupFile[];
+    detectedDirectories: DetectedDirectory[];
 }>();
 const form = useForm({ ...props.settings });
+const automaticallySelectedPath = ref<string | null>(null);
+const recommendedDirectory = props.detectedDirectories.find((directory) => directory.recommended);
+if (
+    (!props.backupDirectory.exists || !props.backupDirectory.writable) &&
+    recommendedDirectory !== undefined
+) {
+    form.root_path = recommendedDirectory.path;
+    form.subdirectory = '';
+    automaticallySelectedPath.value = recommendedDirectory.path;
+}
+const formDestination = computed(() => {
+    const rootPath = form.root_path.replace(/\/+$/, '');
+    return form.subdirectory === '' ? rootPath : `${rootPath}/${form.subdirectory}`;
+});
+const mountedDirectory = computed({
+    get: () =>
+        props.detectedDirectories.some((directory) => directory.path === formDestination.value)
+            ? formDestination.value
+            : '',
+    set: (path: string) => {
+        form.root_path = path;
+        form.subdirectory = '';
+        form.clearErrors('root_path', 'subdirectory');
+    },
+});
 const restoreForm = useForm<{ backup: File | null; confirmation: string }>({
     backup: null,
     confirmation: '',
@@ -123,16 +155,80 @@ function formatDate(value: string | null) {
                             </label>
 
                             <div class="grid gap-5 md:grid-cols-2">
-                                <div class="space-y-1.5 md:col-span-2">
-                                    <InputLabel for="root-path" value="Folder inside Solidtime" />
+                                <div
+                                    v-if="detectedDirectories.length > 0"
+                                    class="space-y-1.5 md:col-span-2">
+                                    <InputLabel
+                                        for="detected-backup-folder"
+                                        value="Mounted backup folder" />
+                                    <Select v-model="mountedDirectory">
+                                        <SelectTrigger
+                                            id="detected-backup-folder"
+                                            data-testid="detected_backup_folder"
+                                            class="w-full">
+                                            <SelectValue placeholder="Choose a mounted folder" />
+                                        </SelectTrigger>
+                                        <SelectContent class="max-h-72">
+                                            <SelectItem
+                                                v-for="directory in detectedDirectories"
+                                                :key="directory.path"
+                                                :value="directory.path">
+                                                {{ directory.recommended ? 'Recommended — ' : ''
+                                                }}{{ directory.path }}
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p class="text-sm text-text-secondary">
+                                        Solidtime found {{ detectedDirectories.length }} writable
+                                        {{
+                                            detectedDirectories.length === 1 ? 'folder' : 'folders'
+                                        }}
+                                        mounted into this container. Choose one to use the complete
+                                        folder without typing a path.
+                                    </p>
+                                    <p
+                                        v-if="automaticallySelectedPath"
+                                        class="text-sm text-amber-700 dark:text-amber-300">
+                                        Your previous folder was unavailable, so
+                                        {{ automaticallySelectedPath }} was selected. Save the
+                                        settings to use it.
+                                    </p>
+                                    <InputError :message="form.errors.root_path" />
+                                </div>
+
+                                <details
+                                    v-if="detectedDirectories.length > 0"
+                                    class="md:col-span-2 rounded-lg border border-default-background-separator px-4 py-3">
+                                    <summary
+                                        class="cursor-pointer text-sm font-medium text-text-secondary">
+                                        Advanced: enter a container path manually
+                                    </summary>
+                                    <div class="mt-3 space-y-1.5">
+                                        <InputLabel
+                                            for="root-path"
+                                            value="Backup destination path" />
+                                        <TextInput
+                                            id="root-path"
+                                            v-model="form.root_path"
+                                            class="w-full" />
+                                        <p class="text-sm text-text-secondary">
+                                            The path must already be mounted and writable inside the
+                                            container. This setting cannot create a Docker or
+                                            TrueNAS mount.
+                                        </p>
+                                    </div>
+                                </details>
+
+                                <div v-else class="space-y-1.5 md:col-span-2">
+                                    <InputLabel for="root-path" value="Backup destination path" />
                                     <TextInput
                                         id="root-path"
                                         v-model="form.root_path"
                                         class="w-full" />
                                     <p class="text-sm text-text-secondary">
-                                        Use a folder under {{ backupDirectory.container_path }}.
-                                        Docker controls the host mount, so this setting cannot mount
-                                        a new TrueNAS folder.
+                                        No writable backup mount was detected. Apply the NovaPro
+                                        Compose override, then recreate the app and scheduler
+                                        containers.
                                     </p>
                                     <InputError :message="form.errors.root_path" />
                                 </div>
