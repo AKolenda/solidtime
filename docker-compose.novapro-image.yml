@@ -1,10 +1,22 @@
-# Apply this override after the existing production Compose file.
-# SOLIDTIME_IMAGE can pin a tested revision, for example:
-# ghcr.io/akolenda/solidtime:sha-586293b
+# Apply this single NovaPro override after the existing production Compose file.
 services:
     app:
         image: '${SOLIDTIME_IMAGE:-ghcr.io/akolenda/solidtime:latest}'
         pull_policy: always
+        environment:
+            DATABASE_BACKUP_HOST_PATH: '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}'
+            DATABASE_BACKUP_CONTAINER_PATH: '/backups'
+            DATABASE_BACKUP_ROOT_PATH: '/backups/solidtime_backups'
+            DATABASE_BACKUP_TIMEZONE: '${DATABASE_BACKUP_TIMEZONE:-America/Edmonton}'
+        volumes:
+            - '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}:/backups'
     scheduler:
         image: '${SOLIDTIME_IMAGE:-ghcr.io/akolenda/solidtime:latest}'
         pull_policy: always
+        environment:
+            DATABASE_BACKUP_HOST_PATH: '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}'
+            DATABASE_BACKUP_CONTAINER_PATH: '/backups'
+            DATABASE_BACKUP_ROOT_PATH: '/backups/solidtime_backups'
+            DATABASE_BACKUP_TIMEZONE: '${DATABASE_BACKUP_TIMEZONE:-America/Edmonton}'
+        volumes:
+            - '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}:/backups'

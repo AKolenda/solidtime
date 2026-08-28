@@ -27,14 +27,45 @@ class DatabaseBackupEndpointTest extends EndpointTestAbstract
             ->assertInertia(fn (Assert $page) => $page
                 ->component('DatabaseBackups')
                 ->where('settings.timezone', 'UTC')
-                ->where('settings.root_path', '/backups')
+                ->where('settings.root_path', '/backups/solidtime_backups')
                 ->has('timezones', fn (Assert $timezones) => $timezones
                     ->where('0', 'Africa/Abidjan')
                     ->etc())
-                ->where('backupDirectory.path', '/backups')
+                ->where('backupDirectory.path', '/backups/solidtime_backups')
                 ->has('backupFiles')
                 ->has('runs')
             );
+    }
+
+    public function test_legacy_host_backup_path_is_changed_to_the_container_path(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        config([
+            'database-backup.host_path' => '/mnt/solidtime_backups',
+            'database-backup.container_path' => '/backups',
+        ]);
+        DatabaseBackupSetting::query()->create([
+            'enabled' => true,
+            'root_path' => '/mnt/solidtime_backups/solidtime_backups',
+            'subdirectory' => '',
+            'time' => '02:00',
+            'timezone' => 'America/Edmonton',
+            'retention_days' => 30,
+            'output_format' => 'both',
+        ]);
+
+        $this->actingAs($data->user)
+            ->get(route('database-backups.show'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('settings.root_path', '/backups/solidtime_backups')
+                ->where('backupDirectory.host_path', '/mnt/solidtime_backups')
+                ->where('backupDirectory.container_path', '/backups')
+            );
+
+        $this->assertDatabaseHas('database_backup_settings', [
+            'root_path' => '/backups/solidtime_backups',
+        ]);
     }
 
     public function test_backup_page_lists_only_completed_backup_files_from_the_destination(): void

@@ -53,16 +53,34 @@ class DatabaseBackupController extends Controller
         ]);
     }
 
-    /** @return array{path: string, exists: bool, readable: bool, writable: bool} */
+    /** @return array{path: string, host_path: string|null, container_path: string, exists: bool, readable: bool, writable: bool, message: string} */
     private function backupDirectory(DatabaseBackupConfiguration $configuration): array
     {
         $path = $configuration->destinationPath();
+        $exists = is_dir($path);
+        $readable = $exists && is_readable($path);
+        $writable = $exists && is_writable($path);
+        $configuredHostPath = config('database-backup.host_path');
+        $hostPath = is_string($configuredHostPath) && $configuredHostPath !== ''
+            ? $configuredHostPath
+            : null;
+
+        $message = match (true) {
+            ! $exists => 'Solidtime cannot see this folder. Apply the NovaPro Compose override, then recreate the app and scheduler containers.',
+            ! $readable => 'Solidtime can see this folder, but the container user cannot read it.',
+            ! $writable && $hostPath !== null => "Solidtime cannot write here. Give container user 1000 write access to {$hostPath} on the host.",
+            ! $writable => 'Solidtime can see this folder, but the container user cannot write to it.',
+            default => 'Solidtime can read and write this folder.',
+        };
 
         return [
             'path' => $path,
-            'exists' => is_dir($path),
-            'readable' => is_dir($path) && is_readable($path),
-            'writable' => is_dir($path) && is_writable($path),
+            'host_path' => $hostPath,
+            'container_path' => (string) config('database-backup.container_path'),
+            'exists' => $exists,
+            'readable' => $readable,
+            'writable' => $writable,
+            'message' => $message,
         ];
     }
 
@@ -116,7 +134,7 @@ class DatabaseBackupController extends Controller
         ], [
             'root_path.regex' => 'The backup destination must be an absolute path visible inside the container.',
         ]);
-        $data['root_path'] = rtrim($data['root_path'], DIRECTORY_SEPARATOR);
+        $data['root_path'] = DatabaseBackupConfiguration::containerPathFor($data['root_path']);
         $data['subdirectory'] = $data['subdirectory'] ?? '';
 
         DatabaseBackupSetting::query()->firstOrNew()->fill($data)->save();

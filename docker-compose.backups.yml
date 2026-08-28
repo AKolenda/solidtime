@@ -1,6 +1,5 @@
-# Add this file after the production Solidtime Compose file.
-# Example: docker compose -f docker-compose.yml -f docker-compose.backups.yml up -d
+# Deprecated compatibility file. docker-compose.novapro-image.yml now owns the
+# image selection and backup mounts. New deployments do not need this file.
 services:
-    scheduler:
-        volumes:
-            - '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}:/backups'
+    app: {}
+    scheduler: {}

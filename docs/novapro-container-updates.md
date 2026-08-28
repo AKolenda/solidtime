@@ -7,17 +7,24 @@ Every successful push to `AKolenda/solidtime`'s `main` branch publishes two Linu
 
 The SHA tag provides a stable rollback target. `latest` advances only after the complete application and container build succeeds.
 
-## One-time server setup
+## Set up the server once
 
-Keep the existing production Compose file and apply `docker-compose.novapro-image.yml` after it. Also continue applying `docker-compose.backups.yml` when database backups are enabled.
+Create the host backup folder and give Solidtime's container user access:
+
+```bash
+sudo install -d -o 1000 -g 1000 -m 0750 /mnt/solidtime_backups/solidtime_backups
+```
+
+Keep the existing production Compose file. Apply `docker-compose.novapro-image.yml` after it. This one override selects the NovaPro image and mounts the backup folder in both required containers.
 
 ```bash
 docker compose \
   -f <production-compose-file> \
-  -f docker-compose.backups.yml \
   -f docker-compose.novapro-image.yml \
   config
 ```
+
+The override maps `${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}` on the host to `/backups` inside Solidtime. The Database Backups page defaults to `/backups/solidtime_backups`. Do not enter the host path in the browser.
 
 If the GHCR package is private, authenticate once using a GitHub personal access token with `read:packages` permission:
 
@@ -34,13 +41,11 @@ Run the same Compose file set for both commands:
 ```bash
 docker compose \
   -f <production-compose-file> \
-  -f docker-compose.backups.yml \
   -f docker-compose.novapro-image.yml \
   pull app scheduler
 
 docker compose \
   -f <production-compose-file> \
-  -f docker-compose.backups.yml \
   -f docker-compose.novapro-image.yml \
   up -d app scheduler
 ```

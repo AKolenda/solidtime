@@ -37,9 +37,12 @@ type BackupRun = {
 
 type BackupDirectory = {
     path: string;
+    host_path: string | null;
+    container_path: string;
     exists: boolean;
     readable: boolean;
     writable: boolean;
+    message: string;
 };
 
 type BackupFile = {
@@ -121,15 +124,15 @@ function formatDate(value: string | null) {
 
                             <div class="grid gap-5 md:grid-cols-2">
                                 <div class="space-y-1.5 md:col-span-2">
-                                    <InputLabel for="root-path" value="Backup destination" />
+                                    <InputLabel for="root-path" value="Folder inside Solidtime" />
                                     <TextInput
                                         id="root-path"
                                         v-model="form.root_path"
                                         class="w-full" />
                                     <p class="text-sm text-text-secondary">
-                                        Use an absolute path already mounted and writable inside the
-                                        container, such as /backups. Changing this field does not
-                                        create a Docker or TrueNAS mount.
+                                        Use a folder under {{ backupDirectory.container_path }}.
+                                        Docker controls the host mount, so this setting cannot mount
+                                        a new TrueNAS folder.
                                     </p>
                                     <InputError :message="form.errors.root_path" />
                                 </div>
@@ -234,7 +237,7 @@ function formatDate(value: string | null) {
                                 <div class="min-w-0 flex-1">
                                     <div
                                         class="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-                                        <span class="font-medium">Mounted backup folder</span>
+                                        <span class="font-medium">Backup folder</span>
                                         <span
                                             :class="
                                                 backupDirectory.exists &&
@@ -254,6 +257,15 @@ function formatDate(value: string | null) {
                                     </div>
                                     <p class="mt-1 break-all text-sm text-text-secondary">
                                         {{ backupDirectory.path }}
+                                    </p>
+                                    <p
+                                        v-if="backupDirectory.host_path"
+                                        class="mt-1 break-all text-xs text-text-tertiary">
+                                        Host mount: {{ backupDirectory.host_path }} →
+                                        {{ backupDirectory.container_path }}
+                                    </p>
+                                    <p class="mt-2 text-sm text-text-secondary">
+                                        {{ backupDirectory.message }}
                                     </p>
                                 </div>
                             </div>
