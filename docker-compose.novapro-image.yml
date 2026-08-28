@@ -5,8 +5,6 @@ services:
         pull_policy: always
         environment:
             DATABASE_BACKUP_HOST_PATH: '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}'
-            DATABASE_BACKUP_CONTAINER_PATH: '/backups'
-            DATABASE_BACKUP_ROOT_PATH: '/backups/solidtime_backups'
             DATABASE_BACKUP_TIMEZONE: '${DATABASE_BACKUP_TIMEZONE:-America/Edmonton}'
         volumes:
             - '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}:/backups'
@@ -15,8 +13,6 @@ services:
         pull_policy: always
         environment:
             DATABASE_BACKUP_HOST_PATH: '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}'
-            DATABASE_BACKUP_CONTAINER_PATH: '/backups'
-            DATABASE_BACKUP_ROOT_PATH: '/backups/solidtime_backups'
             DATABASE_BACKUP_TIMEZONE: '${DATABASE_BACKUP_TIMEZONE:-America/Edmonton}'
         volumes:
             - '${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}:/backups'

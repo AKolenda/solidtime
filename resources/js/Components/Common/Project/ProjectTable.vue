@@ -7,6 +7,8 @@ import ProjectCreateModal from '@/packages/ui/src/Project/ProjectCreateModal.vue
 import ProjectTableHeading from '@/Components/Common/Project/ProjectTableHeading.vue';
 import ProjectTableRow from '@/Components/Common/Project/ProjectTableRow.vue';
 import Pagination from '@/Components/Common/Pagination.vue';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/packages/ui/src';
+import { useStorage } from '@vueuse/core';
 
 export type SortColumn =
     | 'name'
@@ -149,17 +151,35 @@ const sortedProjects = computed(() => {
 });
 
 // Client-side pagination: the full list is in memory, only one page is mounted at a time.
-const PAGE_SIZE = 15;
+type ProjectPageSize = '25' | '50' | '100' | 'all';
+const pageSize = useStorage<ProjectPageSize>('project-table-page-size', '25');
 const currentPage = ref(1);
 
-watch([() => props.sortColumn, () => props.sortDirection, () => props.projects], () => {
+const itemsPerPage = computed(() => {
+    if (pageSize.value === 'all') {
+        return Math.max(sortedProjects.value.length, 1);
+    }
+
+    return Number(pageSize.value);
+});
+
+watch([() => props.sortColumn, () => props.sortDirection, () => props.projects, pageSize], () => {
     currentPage.value = 1;
 });
 
 const paginatedProjects = computed(() => {
-    const start = (currentPage.value - 1) * PAGE_SIZE;
-    return sortedProjects.value.slice(start, start + PAGE_SIZE);
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    return sortedProjects.value.slice(start, start + itemsPerPage.value);
 });
+
+const firstVisibleProject = computed(() => {
+    if (sortedProjects.value.length === 0) return 0;
+    return (currentPage.value - 1) * itemsPerPage.value + 1;
+});
+
+const lastVisibleProject = computed(() =>
+    Math.min(currentPage.value * itemsPerPage.value, sortedProjects.value.length)
+);
 
 const showCreateProjectModal = ref(false);
 
@@ -226,8 +246,36 @@ const gridTemplate = computed(() => {
             </div>
         </div>
     </div>
-    <Pagination
-        v-model:page="currentPage"
-        :total="sortedProjects.length"
-        :items-per-page="PAGE_SIZE"></Pagination>
+    <div
+        v-if="sortedProjects.length > 0"
+        class="grid grid-cols-1 items-center gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_1fr] sm:px-6">
+        <div class="flex items-center gap-2 text-sm text-text-secondary">
+            <span class="whitespace-nowrap">Projects per page</span>
+            <Select v-model="pageSize">
+                <SelectTrigger
+                    aria-label="Projects per page"
+                    data-testid="project_page_size"
+                    class="h-9 w-[82px] bg-card-background">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <Pagination
+            v-model:page="currentPage"
+            class="!w-auto !py-0"
+            :total="sortedProjects.length"
+            :items-per-page="itemsPerPage"></Pagination>
+
+        <p class="text-sm text-text-secondary sm:text-right">
+            Showing {{ firstVisibleProject }}–{{ lastVisibleProject }} of
+            {{ sortedProjects.length }}
+        </p>
+    </div>
 </template>

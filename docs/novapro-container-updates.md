@@ -26,6 +26,14 @@ docker compose \
 
 The override maps `${DATABASE_BACKUP_HOST_PATH:-/mnt/solidtime_backups}` on the host to `/backups` inside Solidtime. The Database Backups page defaults to `/backups/solidtime_backups`. Do not enter the host path in the browser.
 
+To use a different host folder, set one value in the `.env` file beside the Compose files:
+
+```dotenv
+DATABASE_BACKUP_HOST_PATH=/your/host/backup/folder
+```
+
+No other backup path setting is required. Docker Compose reads this value for both the app and scheduler containers. The folder must already exist and be writable by container user 1000.
+
 If the GHCR package is private, authenticate once using a GitHub personal access token with `read:packages` permission:
 
 ```bash
