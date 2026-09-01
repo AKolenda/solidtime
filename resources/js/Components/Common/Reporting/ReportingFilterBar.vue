@@ -81,11 +81,14 @@ async function createTag(name: string) {
                             :icon="FolderIcon" />
                     </template>
                 </ProjectMultiselectDropdown>
-                <TaskMultiselectDropdown v-model="selectedTasks" @submit="emit('submit')">
-                    <template #trigger>
+                <TaskMultiselectDropdown
+                    v-model="selectedTasks"
+                    :project-ids="selectedProjects"
+                    @submit="emit('submit')">
+                    <template #trigger="{ count, active }">
                         <ReportingFilterBadge
-                            :count="selectedTasks.length"
-                            :active="selectedTasks.length > 0"
+                            :count="count"
+                            :active="active"
                             title="Tasks"
                             :icon="CheckCircleIcon" />
                     </template>
