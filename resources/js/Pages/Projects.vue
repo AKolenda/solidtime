@@ -307,10 +307,6 @@ async function exportDetailedPdf() {
                         class="w-60 border-transparent bg-transparent pl-7 shadow-none placeholder:text-text-tertiary hover:bg-black/5 focus-visible:bg-input-background dark:hover:bg-white/5 [&::-webkit-search-cancel-button]:hidden" />
                 </div>
 
-                <div data-testid="project_date_filter" class="w-72 shrink-0">
-                    <DateRangePicker v-model:start="filterStartDate" v-model:end="filterEndDate" />
-                </div>
-
                 <!-- Active Filters -->
                 <ProjectStatusFilterBadge
                     v-if="tableState.filters.status !== 'all'"
@@ -338,11 +334,14 @@ async function exportDetailedPdf() {
                     @remove="removeClientFilter"
                     @update:value="tableState.filters.clientIds = $event as string[]" />
 
-                <!-- Pushed to the right edge, aligned with the filter/search row -->
+                <div data-testid="project_date_filter" class="ml-auto shrink-0">
+                    <DateRangePicker v-model:start="filterStartDate" v-model:end="filterEndDate" />
+                </div>
+
                 <SecondaryButton
                     v-if="canCreateProjects()"
                     :icon="PlusIcon"
-                    class="ml-auto shrink-0"
+                    class="shrink-0"
                     @click="showCreateProjectModal = true"
                     >Create Project
                 </SecondaryButton>

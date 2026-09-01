@@ -3,7 +3,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../popover';
 import Button from '../Buttons/Button.vue';
 import { RangeCalendar } from '../range-calendar';
 import { CalendarDate } from '@internationalized/date';
-import { CalendarIcon } from '@lucide/vue';
+import { CalendarIcon, Check } from '@lucide/vue';
 import { computed, ref, inject, type ComputedRef, watch } from 'vue';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -72,69 +72,124 @@ const modelValue = computed<CalendarDateRange>({
 
 const open = ref(false);
 
-function setToday() {
-    emit('update:start', getLocalizedDayJs().startOf('day').format());
-    emit('update:end', getLocalizedDayJs().endOf('day').format());
-    open.value = false;
+interface DatePreset {
+    key: string;
+    label: string;
+    range: () => {
+        start: ReturnType<typeof getLocalizedDayJs>;
+        end: ReturnType<typeof getLocalizedDayJs>;
+    };
 }
 
-function setThisWeek() {
-    emit('update:start', getLocalizedDayJs().startOf('week').format());
-    emit('update:end', getLocalizedDayJs().endOf('week').format());
-    open.value = false;
-}
+const presets: DatePreset[] = [
+    {
+        key: 'today',
+        label: 'Today',
+        range: () => ({
+            start: getLocalizedDayJs().startOf('day'),
+            end: getLocalizedDayJs().endOf('day'),
+        }),
+    },
+    {
+        key: 'this-week',
+        label: 'This Week',
+        range: () => ({
+            start: getLocalizedDayJs().startOf('week'),
+            end: getLocalizedDayJs().endOf('week'),
+        }),
+    },
+    {
+        key: 'last-week',
+        label: 'Last Week',
+        range: () => ({
+            start: getLocalizedDayJs().subtract(1, 'week').startOf('week'),
+            end: getLocalizedDayJs().subtract(1, 'week').endOf('week'),
+        }),
+    },
+    {
+        key: 'last-14-days',
+        label: 'Last 14 days',
+        range: () => ({
+            start: getLocalizedDayJs().subtract(14, 'days'),
+            end: getLocalizedDayJs(),
+        }),
+    },
+    {
+        key: 'this-month',
+        label: 'This Month',
+        range: () => ({
+            start: getLocalizedDayJs().startOf('month'),
+            end: getLocalizedDayJs().endOf('month'),
+        }),
+    },
+    {
+        key: 'last-month',
+        label: 'Last Month',
+        range: () => ({
+            start: getLocalizedDayJs().subtract(1, 'month').startOf('month'),
+            end: getLocalizedDayJs().subtract(1, 'month').endOf('month'),
+        }),
+    },
+    {
+        key: 'last-30-days',
+        label: 'Last 30 days',
+        range: () => ({
+            start: getLocalizedDayJs().subtract(30, 'days'),
+            end: getLocalizedDayJs(),
+        }),
+    },
+    {
+        key: 'last-90-days',
+        label: 'Last 90 days',
+        range: () => ({
+            start: getDayJsInstance()().subtract(90, 'days'),
+            end: getDayJsInstance()(),
+        }),
+    },
+    {
+        key: 'last-12-months',
+        label: 'Last 12 months',
+        range: () => ({
+            start: getLocalizedDayJs().subtract(12, 'months'),
+            end: getLocalizedDayJs(),
+        }),
+    },
+    {
+        key: 'this-year',
+        label: 'This year',
+        range: () => ({
+            start: getLocalizedDayJs().startOf('year'),
+            end: getLocalizedDayJs().endOf('year'),
+        }),
+    },
+    {
+        key: 'last-year',
+        label: 'Last year',
+        range: () => ({
+            start: getLocalizedDayJs().subtract(1, 'year').startOf('year'),
+            end: getLocalizedDayJs().subtract(1, 'year').endOf('year'),
+        }),
+    },
+];
 
-function setLastWeek() {
-    emit('update:start', getLocalizedDayJs().subtract(1, 'week').startOf('week').format());
-    emit('update:end', getLocalizedDayJs().subtract(1, 'week').endOf('week').format());
-    open.value = false;
-}
+const selectedPreset = computed(() => {
+    if (!props.start || !props.end) {
+        return undefined;
+    }
 
-function setLast14Days() {
-    emit('update:start', getLocalizedDayJs().subtract(14, 'days').format());
-    emit('update:end', getLocalizedDayJs().format());
-    open.value = false;
-}
+    const selectedStart = getLocalizedDayJs(props.start);
+    const selectedEnd = getLocalizedDayJs(props.end);
 
-function setThisMonth() {
-    emit('update:start', getLocalizedDayJs().startOf('month').format());
-    emit('update:end', getLocalizedDayJs().endOf('month').format());
-    open.value = false;
-}
+    return presets.find((preset) => {
+        const range = preset.range();
+        return selectedStart.isSame(range.start, 'day') && selectedEnd.isSame(range.end, 'day');
+    });
+});
 
-function setLastMonth() {
-    emit('update:start', getLocalizedDayJs().subtract(1, 'month').startOf('month').format());
-    emit('update:end', getLocalizedDayJs().subtract(1, 'month').endOf('month').format());
-    open.value = false;
-}
-
-function setLast30Days() {
-    emit('update:start', getLocalizedDayJs().subtract(30, 'days').format());
-    emit('update:end', getLocalizedDayJs().format());
-    open.value = false;
-}
-
-function setLast90Days() {
-    emit('update:start', getDayJsInstance()().subtract(90, 'days').format());
-    emit('update:end', getDayJsInstance()().format());
-    open.value = false;
-}
-
-function setLast12Months() {
-    emit('update:start', getLocalizedDayJs().subtract(12, 'months').format());
-    emit('update:end', getLocalizedDayJs().format());
-    open.value = false;
-}
-
-function setThisYear() {
-    emit('update:start', getLocalizedDayJs().startOf('year').format());
-    emit('update:end', getLocalizedDayJs().endOf('year').format());
-    open.value = false;
-}
-
-function setLastYear() {
-    emit('update:start', getLocalizedDayJs().subtract(1, 'year').startOf('year').format());
-    emit('update:end', getLocalizedDayJs().subtract(1, 'year').endOf('year').format());
+function setPreset(preset: DatePreset) {
+    const range = preset.range();
+    emit('update:start', range.start.format());
+    emit('update:end', range.end.format());
     open.value = false;
 }
 
@@ -159,7 +214,10 @@ watch(open, (value) => {
                     )
                 ">
                 <CalendarIcon class="-ml-0.5 text-text-quaternary h-4 w-4" />
-                <template v-if="modelValue.start">
+                <template v-if="selectedPreset">
+                    {{ selectedPreset.label }}
+                </template>
+                <template v-else-if="modelValue.start">
                     <template v-if="modelValue.end">
                         {{ formatDate(modelValue.start.toString(), organization?.date_format) }}
                         -
@@ -176,39 +234,25 @@ watch(open, (value) => {
             <div class="flex divide-x divide-border-secondary">
                 <div
                     class="text-text-primary text-sm flex flex-col space-y-0.5 items-start py-2 px-2">
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setToday"
-                        >Today</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setThisWeek"
-                        >This Week</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setLastWeek"
-                        >Last Week</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setLast14Days"
-                        >Last 14 days</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setThisMonth"
-                        >This Month</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setLastMonth"
-                        >Last Month</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setLast30Days"
-                        >Last 30 days</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setLast90Days"
-                        >Last 90 days</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setLast12Months"
-                        >Last 12 months</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setThisYear"
-                        >This year</Button
-                    >
-                    <Button variant="ghost" size="sm" class="justify-start" @click="setLastYear"
-                        >Last year</Button
-                    >
+                    <Button
+                        v-for="preset in presets"
+                        :key="preset.key"
+                        variant="ghost"
+                        size="sm"
+                        :aria-pressed="selectedPreset?.key === preset.key"
+                        :class="
+                            twMerge(
+                                'w-full justify-between',
+                                selectedPreset?.key === preset.key &&
+                                    'bg-card-background-active font-medium'
+                            )
+                        "
+                        @click="setPreset(preset)">
+                        <span>{{ preset.label }}</span>
+                        <Check
+                            v-if="selectedPreset?.key === preset.key"
+                            class="h-4 w-4 text-accent-500" />
+                    </Button>
                 </div>
                 <div class="pl-2">
                     <RangeCalendar
