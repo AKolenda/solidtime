@@ -6,7 +6,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <title>Report</title>
+    <title>{{ $shopReport ? "Production time report - ".$shopReport->projectName : "Detailed Report ".$localization->formatDate($start->timezone($timezone))." - ".$localization->formatDate($end->timezone($timezone)) }}</title>
     <style>
 
         html, body, div, span, applet, object, iframe,
@@ -165,7 +165,8 @@
         .user-name { min-width: 0; font-weight: 500; white-space: nowrap; }
         .user-date { flex: none; color: #71717a; font-size: 8px; font-weight: 400; }
         .user-time { margin-top: 3px; color: #71717a; font-size: 9px; white-space: nowrap; }
-        .machine-tags { overflow: hidden; font-size: 8px; line-height: 1.15; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
+        .machine-tags { font-size: 8px; line-height: 1.15; }
+        .machine-tags span { white-space: nowrap; }
 
     </style>
 </head>
@@ -233,8 +234,8 @@
                 <colgroup>
                     <col style="width: 25%;">
                     <col style="width: 9%;">
-                    <col style="width: 55%;">
-                    <col style="width: 11%;">
+                    <col style="width: 50%;">
+                    <col style="width: 16%;">
                 </colgroup>
                 <thead>
                     <tr class="operation-header-row">
@@ -265,7 +266,7 @@
                             @if($activity !== '')<span class="activity-label">{{ $activity }}</span>@endif
                             {{ filled($timeEntry->description) ? $timeEntry->description : '-' }}
                         </td>
-                        <td class="machine-tags">{{ count($timeEntry->tagsRelation) === 0 ? '-' : $timeEntry->tagsRelation->implode('name', ', ') }}</td>
+                        <td class="machine-tags">@forelse($timeEntry->tagsRelation as $tag)<span>{{ $tag->name }}</span>@if(!$loop->last), @endif @empty-@endforelse</td>
                     </tr>
                 @endforeach
                 </tbody>
