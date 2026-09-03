@@ -1597,4 +1597,47 @@ class ProjectEndpointTest extends ApiEndpointTestAbstract
             'id' => $projectMember->getKey(),
         ]);
     }
+
+    public function test_destroy_endpoint_with_force_deletes_project_with_its_tasks_and_time_entries(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'projects:delete',
+        ]);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        $task = Task::factory()->forProject($project)->forOrganization($data->organization)->create();
+        $timeEntry = TimeEntry::factory()->forProject($project)->forOrganization($data->organization)->create([
+            'task_id' => $task->getKey(),
+        ]);
+        $projectMember = ProjectMember::factory()->forMember($data->member)->forProject($project)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->deleteJson(route('api.v1.projects.destroy', [$data->organization->getKey(), $project->getKey(), 'force' => 'true']));
+
+        // Assert
+        $response->assertStatus(204);
+        $this->assertDatabaseMissing(Project::class, ['id' => $project->getKey()]);
+        $this->assertDatabaseMissing(Task::class, ['id' => $task->getKey()]);
+        $this->assertDatabaseMissing(TimeEntry::class, ['id' => $timeEntry->getKey()]);
+        $this->assertDatabaseMissing(ProjectMember::class, ['id' => $projectMember->getKey()]);
+    }
+
+    public function test_destroy_endpoint_without_force_still_refuses_project_in_use(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'projects:delete',
+        ]);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        Task::factory()->forProject($project)->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->deleteJson(route('api.v1.projects.destroy', [$data->organization->getKey(), $project->getKey(), 'force' => 'false']));
+
+        // Assert
+        $response->assertStatus(400);
+        $this->assertDatabaseHas(Project::class, ['id' => $project->getKey()]);
+    }
 }

@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\Role;
 use App\Exceptions\Api\EntityStillInUseApiException;
+use App\Http\Requests\V1\Project\ProjectDestroyRequest;
 use App\Http\Requests\V1\Project\ProjectIndexRequest;
 use App\Http\Requests\V1\Project\ProjectStoreRequest;
 use App\Http\Requests\V1\Project\ProjectUpdateRequest;
@@ -162,22 +163,31 @@ class ProjectController extends Controller
     /**
      * Delete project
      *
+     * With `force=true` the project's time entries and tasks are deleted with it.
+     * Without it, a project that still has either is refused, as upstream does.
+     *
      * @throws AuthorizationException|EntityStillInUseApiException
      *
      * @operationId deleteProject
      */
-    public function destroy(Organization $organization, Project $project): JsonResponse
+    public function destroy(Organization $organization, Project $project, ProjectDestroyRequest $request): JsonResponse
     {
         $this->checkPermission($organization, 'projects:delete', $project);
 
-        if ($project->tasks()->exists()) {
+        $force = $request->getForce();
+        if (! $force && $project->tasks()->exists()) {
             throw new EntityStillInUseApiException('project', 'task');
         }
-        if ($project->timeEntries()->exists()) {
+        if (! $force && $project->timeEntries()->exists()) {
             throw new EntityStillInUseApiException('project', 'time_entry');
         }
 
-        DB::transaction(function () use (&$project): void {
+        DB::transaction(function () use (&$project, $force): void {
+            if ($force) {
+                $project->timeEntries()->delete();
+                $project->tasks()->delete();
+            }
+
             $project->members->each(function (ProjectMember $member): void {
                 $member->delete();
             });
