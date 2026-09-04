@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\TimeZoneController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\UserMembershipController;
 use App\Http\Controllers\Api\V1\UserTimeEntryController;
+use App\Http\Middleware\RequireCreationIdempotencyKey;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -95,6 +96,7 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::get('/projects', [ProjectController::class, 'index'])->name('index');
             Route::get('/projects/{project}', [ProjectController::class, 'show'])->name('show');
             Route::post('/projects', [ProjectController::class, 'store'])->name('store')->middleware('check-organization-blocked');
+            Route::post('/idempotent-projects', [ProjectController::class, 'store'])->name('store-idempotent')->middleware(['check-organization-blocked', RequireCreationIdempotencyKey::class]);
             Route::put('/projects/{project}', [ProjectController::class, 'update'])->name('update')->middleware('check-organization-blocked');
             Route::delete('/projects/{project}', [ProjectController::class, 'destroy'])->name('destroy');
         });
@@ -167,6 +169,7 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
         Route::name('tasks.')->prefix('/organizations/{organization}')->group(static function (): void {
             Route::get('/tasks', [TaskController::class, 'index'])->name('index');
             Route::post('/tasks', [TaskController::class, 'store'])->name('store')->middleware('check-organization-blocked');
+            Route::post('/idempotent-tasks', [TaskController::class, 'store'])->name('store-idempotent')->middleware(['check-organization-blocked', RequireCreationIdempotencyKey::class]);
             Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('update')->middleware('check-organization-blocked');
             Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('destroy');
         });

@@ -27,6 +27,13 @@ class ProjectStoreRequest extends BaseFormRequest
      */
     public function rules(): array
     {
+        // Keyed creation validates inside its transaction, after replay lookup.
+        return $this->hasHeader('Idempotency-Key') ? [] : $this->creationRules();
+    }
+
+    /** @return array<string, array<string|ValidationRule>> */
+    public function creationRules(): array
+    {
         return [
             // Name of the project, the name needs to be unique per client and organization
             'name' => [

@@ -25,6 +25,13 @@ class TaskStoreRequest extends BaseFormRequest
      */
     public function rules(): array
     {
+        // Keyed creation validates inside its transaction, after replay lookup.
+        return $this->hasHeader('Idempotency-Key') ? [] : $this->creationRules();
+    }
+
+    /** @return array<string, array<string|ValidationRule>> */
+    public function creationRules(): array
+    {
         return [
             'name' => [
                 'required',

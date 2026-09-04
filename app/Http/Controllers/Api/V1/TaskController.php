@@ -13,6 +13,7 @@ use App\Http\Resources\V1\Task\TaskResource;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
+use App\Service\ApiCreationIdempotency;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -97,8 +98,11 @@ class TaskController extends Controller
      *
      * @operationId createTask
      */
-    public function store(Organization $organization, TaskStoreRequest $request): JsonResource
+    public function store(Organization $organization, TaskStoreRequest $request, ApiCreationIdempotency $idempotency): JsonResource|JsonResponse
     {
+        if ($request->hasHeader('Idempotency-Key')) {
+            $request->validate(['project_id' => $request->creationRules()['project_id']]);
+        }
         /** @var Project $project */
         $project = Project::query()->findOrFail($request->input('project_id'));
 
@@ -108,16 +112,18 @@ class TaskController extends Controller
             $this->checkScopedPermissionForProject($organization, $project, 'tasks:create');
         }
 
-        $task = new Task;
-        $task->name = $request->input('name');
-        $task->project_id = $request->input('project_id');
-        if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
-            $task->estimated_time = $request->getEstimatedTime();
-        }
-        $task->organization()->associate($organization);
-        $task->save();
+        return $idempotency->execute($request, $organization, 'tasks', function () use ($organization, $request): JsonResource {
+            $task = new Task;
+            $task->name = $request->input('name');
+            $task->project_id = $request->input('project_id');
+            if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
+                $task->estimated_time = $request->getEstimatedTime();
+            }
+            $task->organization()->associate($organization);
+            $task->save();
 
-        return new TaskResource($task);
+            return new TaskResource($task);
+        });
     }
 
     /**

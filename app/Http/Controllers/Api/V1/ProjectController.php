@@ -16,6 +16,7 @@ use App\Models\Organization;
 use App\Models\Project;
 use App\Models\ProjectMember;
 use App\Models\TimeEntry;
+use App\Service\ApiCreationIdempotency;
 use App\Service\BillableRateService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
@@ -97,23 +98,26 @@ class ProjectController extends Controller
      *
      * @operationId createProject
      */
-    public function store(Organization $organization, ProjectStoreRequest $request): JsonResource
+    public function store(Organization $organization, ProjectStoreRequest $request, ApiCreationIdempotency $idempotency): JsonResource|JsonResponse
     {
         $this->checkPermission($organization, 'projects:create');
-        $project = new Project;
-        $project->name = $request->input('name');
-        $project->color = $request->input('color');
-        $project->is_billable = (bool) $request->input('is_billable');
-        $project->billable_rate = $request->getBillableRate();
-        $project->client_id = $request->input('client_id');
-        $project->is_public = $request->getIsPublic();
-        if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
-            $project->estimated_time = $request->getEstimatedTime();
-        }
-        $project->organization()->associate($organization);
-        $project->save();
 
-        return new ProjectResource($project, true);
+        return $idempotency->execute($request, $organization, 'projects', function () use ($organization, $request): JsonResource {
+            $project = new Project;
+            $project->name = $request->input('name');
+            $project->color = $request->input('color');
+            $project->is_billable = (bool) $request->input('is_billable');
+            $project->billable_rate = $request->getBillableRate();
+            $project->client_id = $request->input('client_id');
+            $project->is_public = $request->getIsPublic();
+            if ($this->canAccessPremiumFeatures($organization) && $request->has('estimated_time')) {
+                $project->estimated_time = $request->getEstimatedTime();
+            }
+            $project->organization()->associate($organization);
+            $project->save();
+
+            return new ProjectResource($project, true);
+        });
     }
 
     /**
