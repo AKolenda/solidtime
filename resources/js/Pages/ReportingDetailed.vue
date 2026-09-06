@@ -14,6 +14,11 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuTrigger,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
 } from '@/packages/ui/src';
 import { SecondaryButton } from '@/packages/ui/src';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -29,7 +34,7 @@ import {
 } from '@/packages/api/src';
 import { useTagsQuery } from '@/utils/useTagsQuery';
 import { useTagsStore } from '@/utils/useTags';
-import { useSessionStorage } from '@vueuse/core';
+import { useSessionStorage, useStorage } from '@vueuse/core';
 import DetailedReportTable from '@/Components/Common/Reporting/DetailedReportTable.vue';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
@@ -78,7 +83,9 @@ const roundingType = ref<TimeEntryRoundingType>('nearest');
 const roundingMinutes = ref<number>(15);
 
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
-const pageLimit = 15;
+const pageSize = useStorage<'25' | '50' | '100' | 'all'>('detailed-report-page-size', '25');
+const allEntries = computed(() => pageSize.value === 'all');
+const pageLimit = computed(() => (allEntries.value ? 10000 : Number(pageSize.value)));
 
 // Watch rounding enabled state to trigger updates
 watch(roundingEnabled, () => {
@@ -91,8 +98,8 @@ function getFilterAttributes() {
         start: getLocalizedDayJs(startDate.value).startOf('day').utc().format(),
         end: getLocalizedDayJs(endDate.value).endOf('day').utc().format(),
         active: 'false' as 'true' | 'false',
-        limit: pageLimit,
-        offset: currentPage.value * pageLimit - pageLimit,
+        limit: pageLimit.value,
+        offset: allEntries.value ? 0 : (currentPage.value - 1) * pageLimit.value,
     };
     const params = {
         ...defaultParams,
@@ -133,10 +140,15 @@ async function updateTimeEntries(
 const { tags } = useTagsQuery();
 
 const filterParams = computed(() => getFilterAttributes());
-const { data: timeEntryResponse } = useTimeEntriesReportQuery(filterParams);
+const { data: timeEntryResponse } = useTimeEntriesReportQuery(filterParams, allEntries);
 
-const totalPages = computed(() => {
-    return timeEntryResponse?.value?.meta?.total ?? 1;
+const totalEntries = computed(() => {
+    return timeEntryResponse?.value?.meta?.total ?? 0;
+});
+
+watch(pageSize, () => {
+    currentPage.value = 1;
+    selectedTimeEntries.value = [];
 });
 
 async function deleteTimeEntries(timeEntries: TimeEntry[]) {
@@ -369,6 +381,37 @@ async function downloadExport(format: ExportFormat) {
             :duplicate-time-entry="(entry) => createTimeEntry(entry)"
             :start-time-entry="startTimeEntryFromExisting"></DetailedReportTable>
 
-        <Pagination v-model:page="currentPage" :total="totalPages" :items-per-page="pageLimit" />
+        <div
+            v-if="totalEntries > 0"
+            class="grid grid-cols-1 items-center gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_1fr] sm:px-6">
+            <div class="flex items-center gap-2 text-sm text-text-secondary">
+                <span class="whitespace-nowrap">Entries per page</span>
+                <Select v-model="pageSize">
+                    <SelectTrigger
+                        aria-label="Entries per page"
+                        data-testid="report_page_size"
+                        class="min-h-11 w-[82px] bg-card-background">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="25" class="min-h-11">25</SelectItem>
+                        <SelectItem value="50" class="min-h-11">50</SelectItem>
+                        <SelectItem value="100" class="min-h-11">100</SelectItem>
+                        <SelectItem value="all" class="min-h-11">All</SelectItem>
+                    </SelectContent>
+                </Select>
+            </div>
+            <Pagination
+                v-model:page="currentPage"
+                class="!w-auto !py-0 [&_button]:min-h-11 [&_button]:min-w-11"
+                :total="totalEntries"
+                :items-per-page="allEntries ? Math.max(totalEntries, 1) : pageLimit" />
+            <p class="text-sm text-text-secondary sm:col-start-3 sm:text-right">
+                Showing {{ (currentPage - 1) * pageLimit + 1 }}–{{
+                    Math.min((currentPage - 1) * pageLimit + timeEntries.length, totalEntries)
+                }}
+                of {{ totalEntries }}
+            </p>
+        </div>
     </AppLayout>
 </template>

@@ -723,17 +723,17 @@ test('test that keyboard navigation works in multiselect dropdown', async ({ pag
 // ──────────────────────────────────────────────────
 
 test.describe('Reporting Detailed Pagination', () => {
-    test('test that detailed reporting paginates when there are more than 15 time entries', async ({
+    test('test that detailed reporting paginates when there are more than 25 time entries', async ({
         page,
         ctx,
     }) => {
-        // The detailed report paginates server-side with a page limit of 15.
-        // Create 17 time entries on a single project so we get exactly 2 pages.
+        // The detailed report paginates server-side with a page limit of 25.
+        // Create 27 time entries on a single project so we get exactly 2 pages.
         const seed = Math.floor(Math.random() * 100000);
         const projectName = `ReportPagProj ${seed}`;
         const project = await createProjectViaApi(ctx, { name: projectName });
         const descriptions = Array.from(
-            { length: 17 },
+            { length: 27 },
             (_, i) => `ReportPagEntry ${String(i).padStart(2, '0')} ${seed}`
         );
         await Promise.all(
@@ -761,8 +761,8 @@ test.describe('Reporting Detailed Pagination', () => {
                 visiblePage1.add(description);
             }
         }
-        // The page limit is 15 → exactly 15 entries visible on page 1.
-        expect(visiblePage1.size).toBe(15);
+        // The page limit is 25 → exactly 25 entries visible on page 1.
+        expect(visiblePage1.size).toBe(25);
 
         // Go to page 2 and wait for the server fetch.
         await Promise.all([
@@ -781,8 +781,8 @@ test.describe('Reporting Detailed Pagination', () => {
         for (const description of visiblePage2) {
             expect(visiblePage1.has(description)).toBe(false);
         }
-        // Across both pages, all 17 entries should have been visible.
-        expect(visiblePage1.size + visiblePage2.size).toBe(17);
+        // Across both pages, all 27 entries should have been visible.
+        expect(visiblePage1.size + visiblePage2.size).toBe(27);
 
         // Page 2 button is selected.
         await expect(page.getByRole('button', { name: 'Page 2' })).toHaveAttribute(
@@ -798,7 +798,7 @@ test.describe('Reporting Detailed Pagination', () => {
         expect((await page.getByText(descriptions[0]!).count()) > 0).toBe(true);
     });
 
-    test('test that reporting pagination is not shown when there are 15 or fewer time entries', async ({
+    test('test that reporting pagination is not shown when there are 25 or fewer time entries', async ({
         page,
         ctx,
     }) => {
