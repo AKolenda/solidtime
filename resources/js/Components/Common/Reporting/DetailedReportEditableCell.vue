@@ -4,6 +4,7 @@ import { PencilIcon } from '@heroicons/vue/16/solid';
 import { Popover, PopoverContent, PopoverTrigger } from '@/packages/ui/src/popover';
 import type { TimeEntry } from '@/packages/api/src';
 import type { ReportEditableField, ReportEntryEditorContext } from './reportEntryEditing';
+import DetailedReportDurationInput from './DetailedReportDurationInput.vue';
 import DetailedReportFieldEditor from './DetailedReportFieldEditor.vue';
 
 const props = defineProps<{
@@ -81,7 +82,17 @@ async function setOpen(value: boolean) {
 </script>
 
 <template>
-    <Popover v-if="editable" :open="open" @update:open="setOpen">
+    <DetailedReportDurationInput
+        v-if="
+            editable &&
+            field === 'duration' &&
+            entries.some((entry) => entry.end && context.canEdit(entry))
+        "
+        :entries="entries"
+        :context="context"
+        ><slot
+    /></DetailedReportDurationInput>
+    <Popover v-else-if="editable && field !== 'duration'" :open="open" @update:open="setOpen">
         <PopoverTrigger as-child>
             <button
                 type="button"

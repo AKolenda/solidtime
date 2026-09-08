@@ -93,6 +93,52 @@ describe('DetailedReportEditableCell', () => {
         );
     });
 
+    it('edits duration in the cell using raw times and saves once on Enter and blur', async () => {
+        const update = vi.fn().mockResolvedValue(undefined);
+        const raw = { ...rounded, start: '2026-08-21T07:00:37Z', end: '2026-08-21T08:56:51Z' };
+        const wrapper = render('duration', {
+            update,
+            loadOriginalEntries: vi.fn().mockResolvedValue([raw]),
+        });
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+        const input = wrapper.get('input[aria-label="Duration"]');
+        expect((input.element as HTMLInputElement).value).toBe('01:56:14');
+        expect(document.querySelector('[data-reka-popper-content-wrapper]')).toBeNull();
+        await input.setValue('01:15:00');
+        await input.trigger('keydown', { key: 'Enter' });
+        await input.trigger('blur');
+        await flushPromises();
+        expect(update).toHaveBeenCalledExactlyOnceWith(['entry'], {
+            start: raw.start,
+            end: '2026-08-21T08:15:37Z',
+        });
+    });
+
+    it('saves duration on blur, cancels with Escape, and keeps invalid input editable', async () => {
+        const update = vi.fn().mockResolvedValue(undefined);
+        const wrapper = render('duration', { update });
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+        await wrapper.get('input').setValue('00:30:00');
+        await wrapper.get('input').trigger('keydown', { key: 'Escape' });
+        await flushPromises();
+        expect(update).not.toHaveBeenCalled();
+        await wrapper.get('button').trigger('click');
+        await flushPromises();
+        await wrapper.get('input').setValue('invalid');
+        await wrapper.get('input').trigger('blur');
+        expect(wrapper.find('[role="alert"]').exists()).toBe(true);
+        expect(update).not.toHaveBeenCalled();
+        await wrapper.get('input').setValue('00:30:00');
+        await wrapper.get('input').trigger('blur');
+        await flushPromises();
+        expect(update).toHaveBeenCalledExactlyOnceWith(['entry'], {
+            start: rounded.start,
+            end: '2026-08-21T07:30:00Z',
+        });
+    });
+
     it('opens metadata directly and respects ownership and break restrictions', async () => {
         const loadOriginalEntries = vi.fn();
         const wrapper = render('task', { loadOriginalEntries });
