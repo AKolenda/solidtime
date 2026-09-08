@@ -126,6 +126,15 @@ export function canDeleteReport() {
 export function canViewAllTimeEntries() {
     return currentUserHasPermission('time-entries:view:all');
 }
+
+export function canUpdateTimeEntries() {
+    return currentUserHasPermission('time-entries:update:all');
+}
+
+export function canUpdateOwnTimeEntries() {
+    return currentUserHasPermission('time-entries:update:own');
+}
+
 export function canViewInvoices() {
     return currentUserHasPermission('invoices:view');
 }

@@ -7,7 +7,7 @@ import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import TimeTrackerProjectTaskDropdown from '@/packages/ui/src/TimeTracker/TimeTrackerProjectTaskDropdown.vue';
 import { Field, FieldLabel } from '../field';
 import { TagIcon } from '@heroicons/vue/20/solid';
-import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import { formatHumanReadableDuration, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import type {
     CreateClientBody,
     CreateProjectBody,
@@ -32,12 +32,13 @@ import { useBreaksEnabled } from '@/packages/ui/src/utils/useBreaksEnabled';
 // edited (and converted back), but a work entry may only offer the break option when enabled.
 const breaksEnabled = useBreaksEnabled();
 
-const show = defineModel('show', { default: false });
+const show = defineModel<boolean>('show', { default: false });
 const saving = ref(false);
 const deleting = ref(false);
 
 const props = defineProps<{
     timeEntry: TimeEntry | null;
+    relatedTimeEntries?: TimeEntry[];
     enableEstimatedTime: boolean;
     updateTimeEntry: (entry: TimeEntry) => Promise<void>;
     deleteTimeEntry: (timeEntryId: string) => Promise<void>;
@@ -64,21 +65,77 @@ watch(show, (value) => {
 });
 
 const editableTimeEntry = ref<TimeEntry | null>(null);
+const originalTimeEntry = ref<TimeEntry | null>(null);
+
+function editEntry(entry: TimeEntry) {
+    originalTimeEntry.value = entry;
+    editableTimeEntry.value = { ...entry, tags: [...entry.tags] };
+}
+
+const hasChanges = computed(
+    () => JSON.stringify(editableTimeEntry.value) !== JSON.stringify(originalTimeEntry.value)
+);
+
+const selectedEntryId = computed({
+    get: () => editableTimeEntry.value?.id ?? '',
+    set: (id: string) => {
+        const entry = props.relatedTimeEntries?.find((entry) => entry.id === id);
+        if (entry && !hasChanges.value && !saving.value && !deleting.value) {
+            editEntry(entry);
+        }
+    },
+});
+
+function entryTimeLabel(entry: TimeEntry) {
+    const localStart = getLocalizedDayJs(entry.start);
+    const localEnd = entry.end ? getLocalizedDayJs(entry.end) : null;
+    const start = localStart.format('YYYY-MM-DD HH:mm');
+    const end = localEnd
+        ? localEnd.format(localEnd.isSame(localStart, 'day') ? 'HH:mm' : 'YYYY-MM-DD HH:mm')
+        : 'Running';
+    const duration =
+        entry.duration ??
+        (entry.end
+            ? getLocalizedDayJs(entry.end).diff(getLocalizedDayJs(entry.start), 'second')
+            : null);
+    return `${start} – ${end}${duration === null ? '' : ` · ${formatHumanReadableDuration(duration)}`}`;
+}
+
+const projectTasks = computed(() =>
+    props.tasks.filter((task) => task.project_id === editableTimeEntry.value?.project_id)
+);
+
+const taskProxy = computed({
+    get: () => editableTimeEntry.value?.task_id ?? '',
+    set: (id: string) => {
+        if (editableTimeEntry.value) {
+            editableTimeEntry.value.task_id = id || null;
+        }
+    },
+});
 
 watch(
     () => props.timeEntry,
     (newTimeEntry) => {
         if (newTimeEntry) {
-            editableTimeEntry.value = { ...newTimeEntry };
+            editEntry(newTimeEntry);
         }
     },
     { immediate: true }
 );
 
 watch(
-    () => editableTimeEntry.value?.project_id,
-    (value, oldValue) => {
-        if (oldValue !== undefined && value !== oldValue && editableTimeEntry.value) {
+    () => [editableTimeEntry.value?.id, editableTimeEntry.value?.project_id] as const,
+    ([id, value], [oldId, oldValue]) => {
+        if (
+            id === oldId &&
+            oldValue !== undefined &&
+            value !== oldValue &&
+            editableTimeEntry.value
+        ) {
+            if (!projectTasks.value.some((task) => task.id === editableTimeEntry.value?.task_id)) {
+                editableTimeEntry.value.task_id = null;
+            }
             const project = props.projects.find((p) => p.id === value);
             if (project) {
                 editableTimeEntry.value.billable = project.is_billable;
@@ -173,6 +230,30 @@ const typeProxy = computed({
 
         <template #content>
             <div v-if="editableTimeEntry" class="space-y-4">
+                <Field v-if="relatedTimeEntries && relatedTimeEntries.length > 1">
+                    <FieldLabel for="time-entry-segment">
+                        Time entry ({{ relatedTimeEntries.length }} grouped)
+                    </FieldLabel>
+                    <select
+                        id="time-entry-segment"
+                        v-model="selectedEntryId"
+                        :disabled="hasChanges || saving || deleting"
+                        class="w-full min-h-11 rounded-md border-input-border bg-input-background text-text-primary text-sm shadow-sm disabled:opacity-60">
+                        <option
+                            v-for="entry in relatedTimeEntries"
+                            :key="entry.id"
+                            :value="entry.id">
+                            {{ entryTimeLabel(entry) }}
+                        </option>
+                    </select>
+                    <p class="text-xs text-text-secondary">
+                        {{
+                            hasChanges
+                                ? 'Save or cancel your changes before choosing another entry.'
+                                : 'Choose the time entry to correct. Changes apply only to this entry.'
+                        }}
+                    </p>
+                </Field>
                 <div class="sm:flex items-end space-y-2 sm:space-y-0 sm:space-x-4">
                     <div class="flex-1">
                         <TextInput
@@ -192,6 +273,7 @@ const typeProxy = computed({
                             v-model:task="editableTimeEntry.task_id"
                             variant="input"
                             size="default"
+                            :no-project-value="null"
                             :clients
                             :create-project
                             :create-client
@@ -251,6 +333,27 @@ const typeProxy = computed({
                         </Select>
                     </div>
                 </div>
+                <Field v-if="!isBreak">
+                    <FieldLabel for="time-entry-task">Task</FieldLabel>
+                    <select
+                        id="time-entry-task"
+                        v-model="taskProxy"
+                        :disabled="!editableTimeEntry.project_id || saving || deleting"
+                        class="w-full min-h-11 rounded-md border-input-border bg-input-background text-text-primary text-sm shadow-sm disabled:opacity-60">
+                        <option value="">No task</option>
+                        <option
+                            v-if="
+                                editableTimeEntry.task_id &&
+                                !projectTasks.some((task) => task.id === editableTimeEntry?.task_id)
+                            "
+                            :value="editableTimeEntry.task_id">
+                            Current task (unavailable)
+                        </option>
+                        <option v-for="task in projectTasks" :key="task.id" :value="task.id">
+                            {{ task.name }}{{ task.is_done ? ' (completed)' : '' }}
+                        </option>
+                    </select>
+                </Field>
                 <div class="grid grid-cols-2 sm:grid-cols-5 gap-4 pt-4">
                     <Field class="col-span-2 sm:col-span-3">
                         <FieldLabel>Duration</FieldLabel>

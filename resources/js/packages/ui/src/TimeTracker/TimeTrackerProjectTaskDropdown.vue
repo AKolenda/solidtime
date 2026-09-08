@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ChevronRightIcon, ChevronDownIcon } from '@heroicons/vue/16/solid';
 import Dropdown from '@/packages/ui/src/Input/Dropdown.vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch, type ComponentPublicInstance } from 'vue';
 import { useVirtualizer } from '@tanstack/vue-virtual';
 import ProjectDropdownItem from '@/packages/ui/src/Project/ProjectDropdownItem.vue';
 import type {
@@ -16,6 +16,11 @@ import { PlusCircleIcon, MinusIcon, XMarkIcon } from '@heroicons/vue/16/solid';
 import ProjectCreateModal from '@/packages/ui/src/Project/ProjectCreateModal.vue';
 import { twMerge } from 'tailwind-merge';
 import { Button } from '@/packages/ui/src/Buttons';
+import { getCurrentUserId } from '@/utils/useUser';
+import {
+    projectPickerStorageKey,
+    useResizableDropdown,
+} from '@/packages/ui/src/Input/useResizableDropdown';
 
 const NO_PROJECT_ID = '';
 
@@ -30,6 +35,14 @@ const project = defineModel<string | null>('project', {
 const searchInput = ref<HTMLInputElement | null>(null);
 const open = ref(false);
 const dropdownViewport = ref<HTMLElement | null>(null);
+const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizableDropdown(
+    projectPickerStorageKey(getCurrentUserId())
+);
+
+function setDropdownViewport(element: Element | ComponentPublicInstance | null) {
+    dropdownViewport.value = element instanceof HTMLElement ? element : null;
+    setResizablePanel(element);
+}
 
 const searchValue = ref('');
 
@@ -623,7 +636,9 @@ const showCreateProject = ref(false);
                     @keydown.right.prevent="expandProject"
                     @keydown.left.prevent="collapseProject" />
                 <div
-                    ref="dropdownViewport"
+                    :ref="setDropdownViewport"
+                    data-testid="project-picker-results"
+                    :style="resizablePanelStyle"
                     class="w-[400px] max-w-[calc(100vw-2rem)] max-h-[350px] overflow-y-scroll relative"
                     @mousemove="mouseEnterHighlightActivated = true">
                     <div :style="{ height: `${totalSize}px`, width: '100%', position: 'relative' }">
@@ -718,6 +733,7 @@ const showCreateProject = ref(false);
                         <span>Create new Project</span>
                     </button>
                 </div>
+                <div v-bind="resizeHandleProps"></div>
             </div>
         </template>
     </Dropdown>

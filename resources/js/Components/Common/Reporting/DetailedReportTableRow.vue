@@ -20,8 +20,18 @@ import {
     formatStartEnd,
     getLocalizedDayJs,
 } from '@/packages/ui/src/utils/time';
-import type { Client, Member, Organization, Project, Tag, Task } from '@/packages/api/src';
+import type {
+    Client,
+    Member,
+    Organization,
+    Project,
+    Tag,
+    Task,
+    TimeEntry,
+} from '@/packages/api/src';
 import type { DetailedReportRow } from '@/Components/Common/Reporting/DetailedReportTable.vue';
+import DetailedReportEditableCell from './DetailedReportEditableCell.vue';
+import type { ReportEntryEditorContext } from './reportEntryEditing';
 
 const props = defineProps<{
     entry: DetailedReportRow;
@@ -34,6 +44,8 @@ const props = defineProps<{
     /** Keyed by `user_id`, because a time entry references the user, not the membership. */
     members: Map<string, Member>;
     organization: Organization | undefined;
+    originalEntries: TimeEntry[];
+    editorContext: ReportEntryEditorContext;
 }>();
 
 const emit = defineEmits<{
@@ -46,6 +58,7 @@ const emit = defineEmits<{
 }>();
 
 const isBreak = computed(() => props.entry.type === 'break');
+const canEdit = computed(() => props.originalEntries.some(props.editorContext.canEdit));
 
 const project = computed(() =>
     props.entry.project_id ? props.projects.get(props.entry.project_id) : undefined
@@ -116,80 +129,137 @@ function onSelectChange(checked: boolean | unknown[]) {
                         @update:checked="onSelectChange" />
                 </div>
                 <div
-                    class="flex items-center min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-secondary">
-                    <span class="truncate">{{
-                        formatDateLocalized(entry.start, organization?.date_format)
-                    }}</span>
+                    class="flex items-center min-w-0 overflow-hidden px-3 py-0 text-sm text-text-secondary">
+                    <DetailedReportEditableCell
+                        field="date"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><span class="truncate">{{
+                            formatDateLocalized(entry.start, organization?.date_format)
+                        }}</span></DetailedReportEditableCell
+                    >
                 </div>
                 <div
-                    class="flex items-center min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-primary">
-                    <span v-if="memberName" class="truncate">{{ memberName }}</span>
-                    <span v-else class="text-text-tertiary">--</span>
+                    class="flex items-center min-w-0 overflow-hidden px-3 py-0 text-sm text-text-primary">
+                    <DetailedReportEditableCell
+                        field="member"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><span v-if="memberName" class="truncate">{{ memberName }}</span>
+                        <span v-else class="text-text-tertiary">--</span>
+                    </DetailedReportEditableCell>
                 </div>
                 <div
-                    class="flex items-center gap-2 min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-primary">
-                    <BreakLabel v-if="isBreak" class="shrink-0" />
-                    <span v-if="entry.description" class="truncate">{{ entry.description }}</span>
-                    <span v-else-if="!isBreak" class="text-text-tertiary">No description</span>
-                    <span
-                        v-if="entry.collapsed_count > 1"
-                        :title="`${entry.collapsed_count} identical entries grouped`"
-                        class="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-xs font-medium text-text-secondary">
-                        x{{ entry.collapsed_count }}
-                    </span>
+                    class="flex items-center gap-2 min-w-0 overflow-hidden px-3 py-0 text-sm text-text-primary">
+                    <DetailedReportEditableCell
+                        field="description"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><BreakLabel v-if="isBreak" class="shrink-0" />
+                        <span v-if="entry.description" class="truncate">{{
+                            entry.description
+                        }}</span>
+                        <span v-else-if="!isBreak" class="text-text-tertiary">No description</span>
+                        <span
+                            v-if="entry.collapsed_count > 1"
+                            :title="`${entry.collapsed_count} identical entries grouped`"
+                            class="shrink-0 rounded-full bg-secondary px-1.5 py-0.5 text-xs font-medium text-text-secondary">
+                            x{{ entry.collapsed_count }}
+                        </span>
+                    </DetailedReportEditableCell>
                 </div>
                 <div
-                    class="flex items-center gap-2 min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-primary">
-                    <template v-if="project">
-                        <div
-                            :style="{ backgroundColor: project.color }"
-                            class="w-2.5 h-2.5 shrink-0 rounded-full"></div>
-                        <span class="truncate">{{ project.name }}</span>
-                    </template>
-                    <span v-else class="text-text-tertiary">No project</span>
+                    class="flex items-center gap-2 min-w-0 overflow-hidden px-3 py-0 text-sm text-text-primary">
+                    <DetailedReportEditableCell
+                        field="project"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><template v-if="project">
+                            <div
+                                :style="{ backgroundColor: project.color }"
+                                class="w-2.5 h-2.5 shrink-0 rounded-full"></div>
+                            <span class="truncate">{{ project.name }}</span>
+                        </template>
+                        <span v-else class="text-text-tertiary">No project</span>
+                    </DetailedReportEditableCell>
                 </div>
                 <div
-                    class="flex items-center min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-primary">
-                    <span v-if="task" class="truncate">{{ task.name }}</span>
-                    <span v-else class="text-text-tertiary">--</span>
+                    class="flex items-center min-w-0 overflow-hidden px-3 py-0 text-sm text-text-primary">
+                    <DetailedReportEditableCell
+                        field="task"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><span v-if="task" class="truncate">{{ task.name }}</span>
+                        <span v-else class="text-text-tertiary">--</span>
+                    </DetailedReportEditableCell>
                 </div>
                 <div
-                    class="flex items-center min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-primary">
-                    <span v-if="client" class="truncate">{{ client.name }}</span>
-                    <span v-else class="text-text-tertiary">No client</span>
+                    class="flex items-center min-w-0 overflow-hidden px-3 py-0 text-sm text-text-primary">
+                    <DetailedReportEditableCell
+                        field="client"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><span v-if="client" class="truncate">{{ client.name }}</span>
+                        <span v-else class="text-text-tertiary">No client</span>
+                    </DetailedReportEditableCell>
                 </div>
                 <div
-                    class="flex items-center gap-1 min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-primary">
-                    <TagBadge
-                        v-if="firstTag"
-                        :name="firstTag.name"
-                        :border="false"
-                        class="min-w-0"></TagBadge>
-                    <span v-if="entryTags.length > 1" class="shrink-0 text-xs text-text-tertiary">
-                        +{{ entryTags.length - 1 }}
-                    </span>
-                    <span v-if="entryTags.length === 0" class="text-text-tertiary">--</span>
+                    class="flex items-center gap-1 min-w-0 overflow-hidden px-3 py-0 text-sm text-text-primary">
+                    <DetailedReportEditableCell
+                        field="tags"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><TagBadge
+                            v-if="firstTag"
+                            :name="firstTag.name"
+                            :border="false"
+                            class="min-w-0"></TagBadge>
+                        <span
+                            v-if="entryTags.length > 1"
+                            class="shrink-0 text-xs text-text-tertiary">
+                            +{{ entryTags.length - 1 }}
+                        </span>
+                        <span v-if="entryTags.length === 0" class="text-text-tertiary">--</span>
+                    </DetailedReportEditableCell>
                 </div>
-                <div class="flex items-center min-w-0 overflow-hidden px-3 py-2.5">
-                    <BillableIcon
-                        :aria-label="entry.billable ? 'Billable' : 'Non billable'"
-                        class="w-5 h-5"
-                        :class="
-                            entry.billable ? 'text-input-select-active' : 'text-icon-default/40'
-                        "></BillableIcon>
+                <div class="flex items-center min-w-0 overflow-hidden px-3 py-0">
+                    <DetailedReportEditableCell
+                        field="billable"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><BillableIcon
+                            :aria-label="entry.billable ? 'Billable' : 'Non billable'"
+                            class="w-5 h-5"
+                            :class="
+                                entry.billable ? 'text-input-select-active' : 'text-icon-default/40'
+                            "></BillableIcon>
+                    </DetailedReportEditableCell>
                 </div>
                 <div
-                    class="flex items-center min-w-0 overflow-hidden px-3 py-2.5 text-sm text-text-secondary">
-                    <span class="truncate">{{
-                        formatStartEnd(entry.start, entry.end, organization?.time_format)
-                    }}</span>
+                    class="flex items-center min-w-0 overflow-hidden px-3 py-0 text-sm text-text-secondary">
+                    <DetailedReportEditableCell
+                        field="time"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><span class="truncate">{{
+                            formatStartEnd(entry.start, entry.end, organization?.time_format)
+                        }}</span></DetailedReportEditableCell
+                    >
                 </div>
                 <div
-                    class="flex items-center min-w-0 overflow-hidden px-3 py-2.5 text-sm font-medium text-text-primary">
-                    <span class="truncate">{{ durationLabel }}</span>
+                    class="flex items-center min-w-0 overflow-hidden px-3 py-0 text-sm font-medium text-text-primary">
+                    <DetailedReportEditableCell
+                        field="duration"
+                        :entries="originalEntries"
+                        :context="editorContext"
+                        ><span class="truncate">{{
+                            durationLabel
+                        }}</span></DetailedReportEditableCell
+                    >
                 </div>
-                <div class="flex items-center justify-end min-w-0 overflow-hidden px-1 py-2.5">
+                <div class="flex items-center justify-end min-w-0 overflow-hidden px-1 py-0">
                     <TimeEntryMoreOptionsDropdown
+                        :show-edit="canEdit"
                         :show-duplicate="canRecreate"
                         @edit="emit('edit')"
                         @duplicate="emit('duplicate')"
@@ -204,7 +274,7 @@ function onSelectChange(checked: boolean | unknown[]) {
                 <PlayIcon class="w-4 h-4 text-icon-default" />
                 <span>Continue</span>
             </ContextMenuItem>
-            <ContextMenuItem class="space-x-3" @select="emit('edit')">
+            <ContextMenuItem v-if="canEdit" class="space-x-3" @select="emit('edit')">
                 <PencilIcon class="w-4 h-4 text-icon-default" />
                 <span>Edit</span>
             </ContextMenuItem>

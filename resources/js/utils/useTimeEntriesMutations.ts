@@ -40,7 +40,9 @@ export function useTimeEntriesMutations() {
     });
 
     const { mutateAsync: updateTimeEntry } = useMutation({
-        mutationFn: async (timeEntry: TimeEntry) => {
+        mutationFn: async (
+            timeEntry: Parameters<typeof api.updateTimeEntry>[0] & { id: string }
+        ) => {
             const organizationId = getCurrentOrganizationId();
             if (organizationId) {
                 return await handleApiRequestNotifications(

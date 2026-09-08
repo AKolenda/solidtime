@@ -2,6 +2,8 @@
 import MultiselectDropdown from '@/packages/ui/src/Input/MultiselectDropdown.vue';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import type { Project } from '@/packages/api/src';
+import { getCurrentUserId } from '@/utils/useUser';
+import { projectPickerStorageKey } from '@/packages/ui/src/Input/useResizableDropdown';
 
 const { projects } = useProjectsQuery();
 
@@ -25,6 +27,7 @@ const emit = defineEmits<{
         :get-key-from-item="getKeyFromItem"
         :get-name-for-item="getNameForItem"
         no-item-label="No Project"
+        :resizable-storage-key="projectPickerStorageKey(getCurrentUserId())"
         @submit="emit('submit')">
         <template #trigger>
             <slot name="trigger"></slot>

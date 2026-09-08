@@ -11,6 +11,7 @@ import { computed, ref, type ComponentPublicInstance, type CSSProperties } from 
  * All the logic lives here so that the shared component only needs a handful of changed lines.
  */
 export const RESIZABLE_DROPDOWN_STORAGE_KEY = 'multiselect-dropdown-size';
+export const projectPickerStorageKey = (userId: string) => `project-picker-size:${userId}`;
 
 const MIN_WIDTH = 240;
 const MAX_WIDTH = 1000;
@@ -27,7 +28,7 @@ const AUTO_SIZE: DropdownSize = { width: 0, height: 0 };
 
 /** Always visible so the panel advertises that it can be dragged wider and taller. */
 const HANDLE_CLASS =
-    'mt-2 h-2 w-full shrink-0 cursor-nwse-resize touch-none select-none rounded-full bg-input-border transition-colors hover:bg-text-quaternary';
+    'ml-auto flex size-11 shrink-0 cursor-nwse-resize touch-none select-none items-end justify-end rounded-br-lg p-2 after:block after:size-3 after:border-b-2 after:border-r-2 after:border-input-border hover:after:border-text-quaternary';
 
 function clamp(value: number, min: number, max: number): number {
     return Math.min(Math.max(value, min), max);
@@ -45,18 +46,20 @@ function resolveElement(target: Element | ComponentPublicInstance | null): HTMLE
     return null;
 }
 
-export function useResizableDropdown() {
-    const size = useStorage<DropdownSize>(RESIZABLE_DROPDOWN_STORAGE_KEY, AUTO_SIZE);
+export function useResizableDropdown(storageKey = RESIZABLE_DROPDOWN_STORAGE_KEY) {
+    const size = useStorage<DropdownSize>(storageKey, AUTO_SIZE);
     const panel = ref<HTMLElement | null>(null);
     const { width: windowWidth, height: windowHeight } = useWindowSize();
 
     // Never let a stored size push the popover off screen, even if the window shrank since.
     const maxWidth = computed(() =>
-        Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, (windowWidth.value || MAX_WIDTH) - 48))
+        Math.max(1, Math.min(MAX_WIDTH, (windowWidth.value || MAX_WIDTH) - 48))
     );
     const maxHeight = computed(() =>
-        Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, (windowHeight.value || MAX_HEIGHT) - 140))
+        Math.max(1, Math.min(MAX_HEIGHT, (windowHeight.value || MAX_HEIGHT) - 140))
     );
+    const minWidth = computed(() => Math.min(MIN_WIDTH, maxWidth.value));
+    const minHeight = computed(() => Math.min(MIN_HEIGHT, maxHeight.value));
 
     /**
      * `maxWidth`/`maxHeight` are reset because the panel keeps its Tailwind caps for the default
@@ -64,12 +67,12 @@ export function useResizableDropdown() {
      */
     const resizablePanelStyle = computed<CSSProperties>(() => {
         const style: CSSProperties = {};
-        if (size.value.width > 0) {
-            style.width = `${clamp(size.value.width, MIN_WIDTH, maxWidth.value)}px`;
+        if (Number.isFinite(size.value?.width) && size.value.width > 0) {
+            style.width = `${clamp(size.value.width, minWidth.value, maxWidth.value)}px`;
             style.maxWidth = 'none';
         }
-        if (size.value.height > 0) {
-            style.height = `${clamp(size.value.height, MIN_HEIGHT, maxHeight.value)}px`;
+        if (Number.isFinite(size.value?.height) && size.value.height > 0) {
+            style.height = `${clamp(size.value.height, minHeight.value, maxHeight.value)}px`;
             style.maxHeight = 'none';
         }
         return style;
@@ -96,10 +99,14 @@ export function useResizableDropdown() {
 
         function onPointermove(moveEvent: PointerEvent) {
             size.value = {
-                width: clamp(startWidth + moveEvent.clientX - startX, MIN_WIDTH, maxWidth.value),
+                width: clamp(
+                    startWidth + moveEvent.clientX - startX,
+                    minWidth.value,
+                    maxWidth.value
+                ),
                 height: clamp(
                     startHeight + moveEvent.clientY - startY,
-                    MIN_HEIGHT,
+                    minHeight.value,
                     maxHeight.value
                 ),
             };
@@ -120,11 +127,34 @@ export function useResizableDropdown() {
         handle.addEventListener('pointercancel', onPointerup);
     }
 
+    function onKeydown(event: KeyboardEvent) {
+        const element = panel.value;
+        if (!element || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+            return;
+        }
+        event.preventDefault();
+
+        const storedWidth = Number.isFinite(size.value?.width) ? size.value.width : 0;
+        const storedHeight = Number.isFinite(size.value?.height) ? size.value.height : 0;
+        const width = storedWidth > 0 ? storedWidth : element.offsetWidth;
+        const height = storedHeight > 0 ? storedHeight : element.offsetHeight;
+        const widthDelta = event.key === 'ArrowLeft' ? -20 : event.key === 'ArrowRight' ? 20 : 0;
+        const heightDelta = event.key === 'ArrowUp' ? -20 : event.key === 'ArrowDown' ? 20 : 0;
+
+        size.value = {
+            width: clamp(width + widthDelta, minWidth.value, maxWidth.value),
+            height: clamp(height + heightDelta, minHeight.value, maxHeight.value),
+        };
+    }
+
     const resizeHandleProps = {
         class: HANDLE_CLASS,
-        title: 'Drag to resize',
-        'aria-hidden': true,
+        title: 'Drag or use arrow keys to resize',
+        role: 'button',
+        tabindex: 0,
+        'aria-label': 'Resize dropdown',
         onPointerdown,
+        onKeydown,
     };
 
     return { setResizablePanel, resizablePanelStyle, resizeHandleProps };

@@ -57,6 +57,7 @@ import ReportingFilterBar from '@/Components/Common/Reporting/ReportingFilterBar
 import { useTimeEntriesReportQuery } from '@/utils/useTimeEntriesReportQuery';
 import { useTimeEntriesMutations } from '@/utils/useTimeEntriesMutations';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
+import { fetchUnroundedReportEntries } from '@/Components/Common/Reporting/fetchUnroundedReportEntries';
 import type { TagMatchType } from '@/types/reporting';
 
 // TimeEntryRoundingType is now defined in ReportingRoundingControls component
@@ -134,7 +135,21 @@ async function updateTimeEntries(
     ids: string[],
     changes: Parameters<typeof updateTimeEntriesMutation>[0]['changes']
 ) {
-    await updateTimeEntriesMutation({ ids, changes });
+    const result = await updateTimeEntriesMutation({ ids, changes });
+    if (!result || result.error.length > 0) {
+        throw new Error(
+            `${result?.error.length ?? ids.length} entries could not be updated. Refresh the report before retrying.`
+        );
+    }
+}
+
+async function loadOriginalEntries(ids: string[]) {
+    return fetchUnroundedReportEntries(ids, getFilterAttributes(), (queries) =>
+        api.getTimeEntries({
+            params: { organization: getCurrentOrganizationId()! },
+            queries,
+        })
+    );
 }
 
 const { tags } = useTagsQuery();
@@ -377,6 +392,8 @@ async function downloadExport(format: ExportFormat) {
             v-model:selected-time-entries="selectedTimeEntries"
             :time-entries="timeEntries"
             :update-time-entry="updateTimeEntry"
+            :update-time-entries="updateTimeEntries"
+            :load-original-entries="roundingEnabled ? loadOriginalEntries : undefined"
             :delete-time-entries="deleteTimeEntries"
             :duplicate-time-entry="(entry) => createTimeEntry(entry)"
             :start-time-entry="startTimeEntryFromExisting"></DetailedReportTable>

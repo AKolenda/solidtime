@@ -15,6 +15,7 @@ import type {
     CreateProjectBody,
     Project,
     TimeEntry,
+    UpdateMultipleTimeEntriesChangeset,
 } from '@/packages/api/src';
 import { Checkbox, TimeEntryEditModal } from '@/packages/ui/src';
 import { useBreaksEnabled } from '@/packages/ui/src/utils/useBreaksEnabled';
@@ -27,20 +28,30 @@ import { useTagsQuery } from '@/utils/useTagsQuery';
 import { useTagsStore } from '@/utils/useTags';
 import { useMembersQuery } from '@/utils/useMembersQuery';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
-import { getCurrentOrganizationId } from '@/utils/useUser';
+import { getCurrentOrganizationId, getCurrentUserId } from '@/utils/useUser';
 import { getOrganizationCurrencyString } from '@/utils/money';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
-import { canCreateProjects } from '@/utils/permissions';
+import {
+    canCreateProjects,
+    canUpdateTimeEntries,
+    canUpdateOwnTimeEntries,
+} from '@/utils/permissions';
 import { collapseTimeEntries, type CollapsedTimeEntry } from '@/utils/collapseTimeEntries';
 import DetailedReportTableHeading from '@/Components/Common/Reporting/DetailedReportTableHeading.vue';
 import DetailedReportTableRow from '@/Components/Common/Reporting/DetailedReportTableRow.vue';
+import type { ReportEntryChanges, ReportEntryEditorContext } from './reportEntryEditing';
 
 export type DetailedReportRow = CollapsedTimeEntry;
 
 const props = defineProps<{
     timeEntries: TimeEntry[];
     selectedTimeEntries: TimeEntry[];
-    updateTimeEntry: (entry: TimeEntry) => Promise<unknown>;
+    updateTimeEntry: (entry: { id: string } & ReportEntryChanges) => Promise<unknown>;
+    updateTimeEntries: (
+        ids: string[],
+        changes: UpdateMultipleTimeEntriesChangeset
+    ) => Promise<void>;
+    loadOriginalEntries?: (ids: string[]) => Promise<TimeEntry[]>;
     deleteTimeEntries: (entries: TimeEntry[]) => void | Promise<unknown>;
     duplicateTimeEntry: (entry: TimeEntry) => void;
     startTimeEntry: (entry: TimeEntry) => void;
@@ -57,6 +68,29 @@ const { tags } = useTagsQuery();
 const { members } = useMembersQuery();
 const { organization } = useOrganizationQuery(getCurrentOrganizationId()!);
 const breaksEnabled = useBreaksEnabled();
+const currentUserId = getCurrentUserId();
+const editorContext = computed<ReportEntryEditorContext>(() => ({
+    projects: projects.value,
+    tasks: tasks.value,
+    clients: clients.value,
+    tags: tags.value,
+    members: members.value,
+    organization: organization.value,
+    userId: currentUserId,
+    canChangeMember: canUpdateTimeEntries(),
+    canEdit: (entry) =>
+        canUpdateTimeEntries() || (canUpdateOwnTimeEntries() && entry.user_id === currentUserId),
+    loadOriginalEntries: props.loadOriginalEntries,
+    update: async (ids, changes) => {
+        if (ids.length === 1) {
+            await props.updateTimeEntry({ id: ids[0]!, ...changes });
+        } else if (ids.length > 1) {
+            if ('start' in changes || 'end' in changes)
+                throw new Error('Choose one entry to change its time.');
+            await props.updateTimeEntries(ids, changes);
+        }
+    },
+}));
 
 // Lookup maps so each row resolves its project / task / client / member / tags in O(1).
 const projectMap = computed(() => new Map(projects.value.map((project) => [project.id, project])));
@@ -154,9 +188,11 @@ function isRowSelected(row: DetailedReportRow): boolean {
 }
 
 /** The original, uncollapsed entries a displayed row stands for. */
+const entriesById = computed(() => new Map(props.timeEntries.map((entry) => [entry.id, entry])));
 function entriesOfRow(row: DetailedReportRow): TimeEntry[] {
-    const ids = new Set(row.collapsed_ids);
-    return props.timeEntries.filter((entry) => ids.has(entry.id));
+    return row.collapsed_ids
+        .map((id) => entriesById.value.get(id))
+        .filter((entry): entry is TimeEntry => !!entry);
 }
 
 function setRowSelected(row: DetailedReportRow, selected: boolean) {
@@ -175,7 +211,7 @@ function setRowSelected(row: DetailedReportRow, selected: boolean) {
 }
 
 /**
- * Actions that only make sense for a single entry (continue, duplicate, edit) act on the
+ * Actions that only make sense for a single entry (continue, duplicate) act on the
  * first entry of a grouped row.
  */
 function firstEntryOfRow(row: DetailedReportRow): TimeEntry | undefined {
@@ -202,17 +238,30 @@ function canRecreate(row: DetailedReportRow): boolean {
 
 const showEditModal = ref(false);
 const entryToEdit = ref<TimeEntry | null>(null);
+const entriesToEdit = ref<TimeEntry[]>([]);
+const editError = ref('');
 
-// A grouped row edits its first underlying entry — the other members of the group
-// keep their own start/end times, which a single edit could not represent.
-function openEditModal(row: DetailedReportRow) {
-    entryToEdit.value = firstEntryOfRow(row) ?? null;
-    if (entryToEdit.value) {
-        showEditModal.value = true;
+// Let the editor choose an underlying entry rather than editing the aggregate's time range.
+async function openEditModal(row: DetailedReportRow) {
+    editError.value = '';
+    try {
+        const entries = entriesOfRow(row).filter(editorContext.value.canEdit);
+        if (entries.length === 0) return;
+        entriesToEdit.value = props.loadOriginalEntries
+            ? await props.loadOriginalEntries(entries.map((entry) => entry.id))
+            : entries;
+        entryToEdit.value = entriesToEdit.value[0] ?? null;
+        if (entryToEdit.value) showEditModal.value = true;
+    } catch {
+        editError.value = 'Could not load original times. Try opening the entry again.';
     }
 }
 
 async function handleModalUpdate(entry: TimeEntry) {
+    const original = entriesToEdit.value.find((candidate) => candidate.id === entry.id);
+    if (!original || !editorContext.value.canEdit(original)) {
+        throw new Error('You do not have permission to edit this entry.');
+    }
     await props.updateTimeEntry(entry);
     showEditModal.value = false;
 }
@@ -240,6 +289,7 @@ async function createTag(name: string) {
 
 <template>
     <div class="w-full">
+        <p v-if="editError" role="alert" class="px-4 py-2 text-sm text-red-600">{{ editError }}</p>
         <div
             class="flex items-center justify-end gap-4 px-4 sm:px-6 lg:px-8 py-2 border-b border-default-background-separator">
             <label
@@ -274,6 +324,8 @@ async function createTag(name: string) {
                             :tags="tagMap"
                             :members="memberMap"
                             :organization="organization"
+                            :original-entries="entriesOfRow(row)"
+                            :editor-context="editorContext"
                             @selected="setRowSelected(row, true)"
                             @unselected="setRowSelected(row, false)"
                             @edit="openEditModal(row)"
@@ -295,6 +347,7 @@ async function createTag(name: string) {
         v-if="showEditModal"
         v-model:show="showEditModal"
         :time-entry="entryToEdit"
+        :related-time-entries="entriesToEdit"
         :enable-estimated-time="isAllowedToPerformPremiumAction()"
         :update-time-entry="handleModalUpdate"
         :delete-time-entry="handleModalDelete"

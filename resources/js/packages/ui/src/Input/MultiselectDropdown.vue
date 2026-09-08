@@ -30,6 +30,7 @@ const props = defineProps<{
     getKeyFromItem: (item: T) => string;
     getNameForItem: (item: T) => string;
     noItemLabel?: string;
+    resizableStorageKey?: string;
 }>();
 
 const open = ref(false);
@@ -96,7 +97,9 @@ function toggleItem(id: string) {
 
 const emit = defineEmits(['update:modelValue', 'changed', 'submit']);
 
-const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizableDropdown();
+const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizableDropdown(
+    props.resizableStorageKey
+);
 </script>
 
 <template>

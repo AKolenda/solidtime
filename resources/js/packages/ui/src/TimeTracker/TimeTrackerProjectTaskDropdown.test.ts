@@ -1,9 +1,13 @@
 /* eslint-disable vue/one-component-per-file */
 import { mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, onMounted } from 'vue';
 import TimeTrackerProjectTaskDropdown from './TimeTrackerProjectTaskDropdown.vue';
 import type { Client, Project, Task } from '@/packages/api/src';
+
+vi.mock('@/utils/useUser', () => ({
+    getCurrentUserId: () => 'user-test',
+}));
 
 const DropdownStub = defineComponent({
     props: {
@@ -58,6 +62,110 @@ async function openDropdown() {
 }
 
 describe('TimeTrackerProjectTaskDropdown', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        HTMLElement.prototype.setPointerCapture = vi.fn();
+        HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
+        HTMLElement.prototype.releasePointerCapture = vi.fn();
+    });
+
+    it('resizes by pointer and saves the size for the current user', async () => {
+        const wrapper = await openDropdown();
+        const handle = wrapper.find('[aria-label="Resize dropdown"]');
+
+        await handle.trigger('pointerdown', {
+            button: 0,
+            clientX: 400,
+            clientY: 350,
+            pointerId: 1,
+        });
+        handle.element.dispatchEvent(
+            new PointerEvent('pointermove', { clientX: 500, clientY: 450, pointerId: 1 })
+        );
+        await nextTick();
+
+        expect(JSON.parse(localStorage.getItem('project-picker-size:user-test') ?? '')).toEqual({
+            width: 500,
+            height: 450,
+        });
+        expect(
+            wrapper.find('[data-testid="project-picker-results"]').attributes('style')
+        ).toContain('width: 500px');
+    });
+
+    it('resizes with arrow keys and persists the clamped dimensions', async () => {
+        const wrapper = await openDropdown();
+        const handle = wrapper.get('[aria-label="Resize dropdown"]');
+
+        await handle.trigger('keydown', { key: 'ArrowRight' });
+        await handle.trigger('keydown', { key: 'ArrowDown' });
+
+        expect(JSON.parse(localStorage.getItem('project-picker-size:user-test') ?? '')).toEqual({
+            width: 420,
+            height: 370,
+        });
+
+        localStorage.setItem(
+            'project-picker-size:user-test',
+            JSON.stringify({ width: 1000, height: 800 })
+        );
+        const clampedWrapper = await openDropdown();
+        await clampedWrapper.get('[aria-label="Resize dropdown"]').trigger('keydown', {
+            key: 'ArrowRight',
+        });
+
+        expect(JSON.parse(localStorage.getItem('project-picker-size:user-test') ?? '')).toEqual({
+            width: window.innerWidth - 48,
+            height: window.innerHeight - 140,
+        });
+    });
+
+    it('clamps a saved size to the current viewport', async () => {
+        localStorage.setItem(
+            'project-picker-size:user-test',
+            JSON.stringify({ width: 4000, height: 4000 })
+        );
+        const wrapper = await openDropdown();
+        const style = wrapper.find('[data-testid="project-picker-results"]').attributes('style');
+
+        expect(style).toContain(`width: ${window.innerWidth - 48}px`);
+        expect(style).toContain(`height: ${window.innerHeight - 140}px`);
+    });
+
+    it('fits narrow viewports below the preferred minimum and ignores malformed sizes', async () => {
+        const originalWidth = window.innerWidth;
+        const originalHeight = window.innerHeight;
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: 260 });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, value: 200 });
+        window.dispatchEvent(new Event('resize'));
+        localStorage.setItem(
+            'project-picker-size:user-test',
+            JSON.stringify({ width: 400, height: 400 })
+        );
+
+        const narrowWrapper = await openDropdown();
+        const narrowStyle = narrowWrapper
+            .find('[data-testid="project-picker-results"]')
+            .attributes('style');
+        expect(narrowStyle).toContain('width: 212px');
+        expect(narrowStyle).toContain('height: 60px');
+        narrowWrapper.unmount();
+
+        localStorage.setItem(
+            'project-picker-size:user-test',
+            JSON.stringify({ width: 'wide', height: null })
+        );
+        const malformedWrapper = await openDropdown();
+        const malformedStyle =
+            malformedWrapper.find('[data-testid="project-picker-results"]').attributes('style') ??
+            '';
+        expect(malformedStyle).not.toContain('width:');
+        expect(malformedStyle).not.toContain('height:');
+
+        Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth });
+        Object.defineProperty(window, 'innerHeight', { configurable: true, value: originalHeight });
+        window.dispatchEvent(new Event('resize'));
+    });
     it('keeps the existing empty-string no-project value by default', async () => {
         const wrapper = await openDropdown();
 
