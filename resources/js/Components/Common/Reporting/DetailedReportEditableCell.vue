@@ -97,7 +97,7 @@ async function setOpen(value: boolean) {
         <PopoverContent
             align="start"
             :collision-padding="12"
-            class="max-w-[calc(100vw-24px)] max-h-[calc(100dvh-24px)] overflow-y-auto border-card-border bg-card-background text-text-primary shadow-dropdown"
+            class="max-w-[calc(100vw-24px)] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-lg border border-card-border bg-secondary text-text-primary shadow-dropdown"
             @open-auto-focus="focusEditor"
             @escape-key-down="saving && $event.preventDefault()"
             @interact-outside="saving && $event.preventDefault()">

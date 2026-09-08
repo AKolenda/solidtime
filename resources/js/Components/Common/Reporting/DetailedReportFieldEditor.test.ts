@@ -114,6 +114,39 @@ describe('DetailedReportFieldEditor', () => {
         });
     });
 
+    it('searches only client names before selecting a project under that client', async () => {
+        const { wrapper, update } = mountEditor('client');
+        const search = wrapper.get('input[aria-label="Search clients"]');
+        expect(wrapper.find('[data-option-id="project-a"]').exists()).toBe(false);
+        await search.setValue('Beta');
+        expect(wrapper.text()).toContain('No matches');
+        await search.setValue('Bravo');
+        expect(wrapper.find('[data-option-id="client-a"]').exists()).toBe(false);
+        await chooseOption(wrapper, 'client-b');
+        expect(update).not.toHaveBeenCalled();
+        expect(wrapper.find('[data-option-id="project-a"]').exists()).toBe(false);
+        expect(wrapper.find('input[aria-label="Search projects"]').exists()).toBe(true);
+        await chooseOption(wrapper, 'project-b');
+        expect(update).toHaveBeenCalledExactlyOnceWith(['entry-a'], {
+            project_id: 'project-b',
+            task_id: null,
+        });
+    });
+
+    it('lets a client selection be changed without saving and handles no client', async () => {
+        const { wrapper, update } = mountEditor('client');
+        await chooseOption(wrapper, 'client-b');
+        await wrapper.get('button').trigger('click');
+        expect(wrapper.find('input[aria-label="Search clients"]').exists()).toBe(true);
+        await chooseOption(wrapper, '');
+        expect(wrapper.find('[data-option-id="project-b"]').exists()).toBe(false);
+        await chooseOption(wrapper, '');
+        expect(update).toHaveBeenCalledExactlyOnceWith(['entry-a'], {
+            project_id: null,
+            task_id: null,
+        });
+    });
+
     it('offers completed tasks and saves the project with the task', async () => {
         const { wrapper, update } = mountEditor('task');
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { CheckIcon } from '@heroicons/vue/16/solid';
+import { useMediaQuery } from '@vueuse/core';
+import Checkbox from '@/packages/ui/src/Input/Checkbox.vue';
 import {
     ComboboxRoot,
     ComboboxAnchor,
@@ -29,6 +30,7 @@ const props = defineProps<{
     context: ReportEntryEditorContext;
 }>();
 const emit = defineEmits<{ close: []; saving: [value: boolean] }>();
+const compactRows = useMediaQuery('(min-width: 640px)');
 const selectedId = ref(props.entries[0]?.id ?? '');
 const selectedEntry = computed(
     () => props.entries.find((entry) => entry.id === selectedId.value) ?? props.entries[0]!
@@ -39,6 +41,11 @@ const targetEntries = computed(() =>
 const temporal = computed(() => ['date', 'time', 'duration'].includes(props.field));
 const label = computed(() => props.field.charAt(0).toUpperCase() + props.field.slice(1));
 const search = ref('');
+const selectedClient = ref<string | null>(null);
+const choosingClient = computed(() => props.field === 'client' && selectedClient.value === null);
+const searchLabel = computed(() =>
+    choosingClient.value ? 'clients' : projectPicker.value ? 'projects' : label.value.toLowerCase()
+);
 const text = ref('');
 const start = ref('');
 const end = ref('');
@@ -93,14 +100,28 @@ const clientsById = computed(
     () => new Map(props.context.clients.map((client) => [client.id, client.name]))
 );
 const options = computed<Option[]>(() => {
+    if (choosingClient.value) {
+        return [
+            { id: '', name: 'No client' },
+            ...props.context.clients.map((client) => ({ id: client.id, name: client.name })),
+        ];
+    }
     if (projectPicker.value) {
         return [
-            { id: '', name: 'No project', detail: 'No client' },
-            ...props.context.projects.map((project) => ({
-                id: project.id,
-                name: project.name,
-                detail: `${clientsById.value.get(project.client_id ?? '') ?? 'No client'}${project.is_archived ? ' · Archived' : ''}`,
-            })),
+            ...(props.field !== 'client' || selectedClient.value === ''
+                ? [{ id: '', name: 'No project' }]
+                : []),
+            ...props.context.projects
+                .filter(
+                    (project) =>
+                        props.field !== 'client' ||
+                        (project.client_id ?? '') === selectedClient.value
+                )
+                .map((project) => ({
+                    id: project.id,
+                    name: project.name,
+                    detail: `${clientsById.value.get(project.client_id ?? '') ?? 'No client'}${project.is_archived ? ' · Archived' : ''}`,
+                })),
         ];
     }
     if (props.field === 'task') {
@@ -132,6 +153,11 @@ const filteredOptions = computed(() => {
 });
 function isSelected(id: string) {
     const entry = selectedEntry.value;
+    if (choosingClient.value)
+        return (
+            (props.context.projects.find((project) => project.id === entry.project_id)?.client_id ??
+                '') === id
+        );
     if (projectPicker.value) return (entry.project_id ?? '') === id;
     if (props.field === 'task') return (entry.task_id ?? '') === id;
     if (props.field === 'member')
@@ -164,6 +190,11 @@ async function save(changes: ReportEntryChanges) {
 
 function chooseOption(id: string) {
     if (saving.value) return;
+    if (choosingClient.value) {
+        selectedClient.value = id;
+        search.value = '';
+        return;
+    }
     if (props.field === 'tags') {
         selectedTags.value = selectedTags.value.includes(id)
             ? selectedTags.value.filter((tag) => tag !== id)
@@ -208,7 +239,7 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
 <template>
     <ComboboxRoot as-child :open="listField" :ignore-filter="true">
         <form
-            class="p-3 space-y-3 w-max max-w-full"
+            class="p-2 space-y-2 w-max max-w-full"
             :aria-label="`Edit ${label.toLowerCase()}`"
             :aria-busy="saving"
             @submit.prevent="submit">
@@ -231,58 +262,67 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                     Save or cancel before choosing another entry.
                 </p>
             </div>
-            <p v-if="field === 'client'" class="text-xs text-text-secondary max-w-sm">
-                Choose a project under the correct client. This changes only the selected time
-                entries.
-            </p>
+            <button
+                v-if="field === 'client' && !choosingClient"
+                type="button"
+                class="flex min-h-11 sm:min-h-8 items-center gap-2 px-2 text-sm text-text-secondary hover:text-text-primary"
+                :disabled="saving"
+                @click="
+                    selectedClient = null;
+                    search = '';
+                ">
+                ? {{ clientsById.get(selectedClient ?? '') ?? 'No client' }} ? Choose project
+            </button>
             <template v-if="listField">
                 <div class="space-y-2">
                     <ComboboxAnchor v-if="field !== 'billable'">
                         <ComboboxInput
                             v-model="search"
-                            :aria-label="`Search ${projectPicker ? 'projects or clients' : label.toLowerCase()}`"
-                            :placeholder="`Search ${projectPicker ? 'projects or clients' : label.toLowerCase()}…`"
+                            :aria-label="`Search ${searchLabel}`"
+                            :placeholder="`Search ${searchLabel}…`"
                             class="report-edit-input"
                             :disabled="saving" />
                     </ComboboxAnchor>
                     <ComboboxContent position="inline" :dismiss-able="false">
                         <ComboboxViewport
-                            :ref="projectPicker ? setResizablePanel : undefined"
-                            :style="projectPicker ? resizablePanelStyle : undefined"
-                            class="w-80 max-w-[calc(100vw-50px)] max-h-72 overflow-y-auto">
+                            :ref="setResizablePanel"
+                            :style="resizablePanelStyle"
+                            class="w-80 max-w-[calc(100vw-40px)] max-h-60 overflow-y-auto">
                             <ComboboxVirtualizer
                                 v-slot="{ option }"
                                 :options="filteredOptions"
-                                :estimate-size="44"
+                                :estimate-size="compactRows ? 32 : 44"
                                 :text-content="(option: Option) => option.name">
                                 <ComboboxItem
                                     :value="option.id || '__none__'"
                                     :disabled="saving"
-                                    class="flex min-h-11 items-center gap-2 rounded px-2 text-sm cursor-pointer data-[highlighted]:bg-card-background-active"
+                                    class="flex w-full min-h-11 sm:min-h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-primary cursor-default data-[highlighted]:bg-card-background-active"
                                     @select.prevent="chooseOption(option.id)">
-                                    <CheckIcon
-                                        class="size-4 shrink-0"
-                                        :class="
-                                            isSelected(option.id)
-                                                ? 'text-input-select-active'
-                                                : 'invisible'
-                                        " />
-                                    <span class="min-w-0 flex-1" :data-option-id="option.id">
-                                        <span class="block truncate" :title="option.name">{{
-                                            option.name
-                                        }}</span>
-                                        <span
-                                            v-if="option.detail"
-                                            class="block truncate text-xs text-text-tertiary"
-                                            >{{ option.detail }}</span
-                                        >
-                                    </span>
+                                    <Checkbox
+                                        :checked="isSelected(option.id)"
+                                        aria-hidden="true"
+                                        :tabindex="-1"
+                                        class="pointer-events-none shrink-0" />
+                                    <span
+                                        class="min-w-0 truncate"
+                                        :data-option-id="option.id"
+                                        :title="
+                                            option.detail
+                                                ? `${option.name} ? ${option.detail}`
+                                                : option.name
+                                        "
+                                        >{{ option.name }}</span
+                                    >
                                 </ComboboxItem>
                             </ComboboxVirtualizer>
                             <p
                                 v-if="filteredOptions.length === 0"
                                 class="p-3 text-sm text-text-secondary">
-                                No matches
+                                {{
+                                    field === 'client' && !choosingClient
+                                        ? 'No projects for this client'
+                                        : 'No matches'
+                                }}
                             </p>
                         </ComboboxViewport>
                     </ComboboxContent>
@@ -325,18 +365,7 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
             </label>
             <p v-if="error" role="alert" class="text-sm text-red-600 max-w-sm">{{ error }}</p>
             <div class="flex items-center justify-between gap-2">
-                <span
-                    v-if="!projectPicker && listField && field !== 'tags'"
-                    class="text-xs text-text-secondary"
-                    >{{
-                        saving
-                            ? 'Saving…'
-                            : selectedId === 'all'
-                              ? `Applies to all ${entries.length} entries`
-                              : 'Applies to this entry'
-                    }}</span
-                >
-                <div class="flex gap-2" :class="{ 'ml-auto': !projectPicker }">
+                <div v-if="!listField || field === 'tags'" class="ml-auto flex gap-2">
                     <button
                         type="button"
                         class="min-h-11 px-3 rounded hover:bg-card-background-active text-sm"
@@ -358,7 +387,7 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                         }}
                     </button>
                 </div>
-                <button v-if="projectPicker" type="button" v-bind="resizeHandleProps"></button>
+                <button v-if="listField" type="button" v-bind="resizeHandleProps"></button>
             </div>
         </form>
     </ComboboxRoot>
@@ -366,6 +395,6 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
 
 <style scoped>
 .report-edit-input {
-    @apply block w-full min-h-11 rounded-md border border-input-border bg-input-background px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60;
+    @apply block w-full min-h-11 sm:min-h-8 rounded-md border border-input-border bg-input-background px-3 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-input-select-active disabled:opacity-60;
 }
 </style>
