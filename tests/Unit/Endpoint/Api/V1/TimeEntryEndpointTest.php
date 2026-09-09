@@ -2389,6 +2389,37 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         ]);
     }
 
+    public function test_aggregate_endpoint_can_fill_gaps_when_the_only_group_is_not_a_time_interval(): void
+    {
+        $data = $this->createUserWithPermission([
+            'time-entries:view:all',
+        ]);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        $entryStart = Carbon::now()->timezone($data->user->timezone)->subDay();
+        TimeEntry::factory()
+            ->forOrganization($data->organization)
+            ->forMember($data->member)
+            ->forProject($project)
+            ->startWithDuration($entryStart, 10)
+            ->create();
+        Passport::actingAs($data->user);
+
+        $response = $this->getJson(route('api.v1.time-entries.aggregate', [
+            $data->organization->getKey(),
+            'group' => 'project',
+            'fill_gaps_in_time_groups' => 'true',
+            'start' => $entryStart->copy()->subSecond()->toIso8601ZuluString(),
+            'end' => $entryStart->copy()->addSeconds(11)->toIso8601ZuluString(),
+        ]));
+
+        $response->assertSuccessful();
+        $response->assertJsonPath('data.grouped_type', 'project');
+        $response->assertJsonPath('data.grouped_data.0.key', $project->getKey());
+        $response->assertJsonPath('data.grouped_data.0.seconds', 10);
+        $response->assertJsonPath('data.grouped_data.0.grouped_type', null);
+        $response->assertJsonPath('data.grouped_data.0.grouped_data', null);
+    }
+
     public function test_aggregate_endpoint_groups_by_one_group_with_fill_gaps_argument(): void
     {
         // Arrange

@@ -408,6 +408,10 @@ class TimeEntryAggregationService
     {
         $interval = $groupType->toInterval();
         if ($interval === null) {
+            if ($subGroupType === null) {
+                return $data;
+            }
+
             foreach ($data as $key => $item) {
                 $data[$key]['grouped_data'] = $this->fillGapsInTimeGroups(
                     $item['grouped_data'],
