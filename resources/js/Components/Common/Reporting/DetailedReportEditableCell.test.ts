@@ -103,7 +103,7 @@ describe('DetailedReportEditableCell', () => {
         await wrapper.get('button').trigger('click');
         await flushPromises();
         const input = wrapper.get('input[aria-label="Duration"]');
-        expect((input.element as HTMLInputElement).value).toBe('01:56:14');
+        expect((input.element as HTMLInputElement).value).toBe('1h 56min');
         expect(document.querySelector('[data-reka-popper-content-wrapper]')).toBeNull();
         await input.setValue('01:15:00');
         await input.trigger('keydown', { key: 'Enter' });

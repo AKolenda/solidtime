@@ -3,7 +3,7 @@ import { nextTick, ref } from 'vue';
 import type { TimeEntry } from '@/packages/api/src';
 import type { ReportEntryEditorContext } from './reportEntryEditing';
 import { changeEntryDuration } from './reportTimeEdits';
-import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
+import { formatHumanReadableDuration, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 
 const props = defineProps<{ entries: TimeEntry[]; context: ReportEntryEditorContext }>();
 const editing = ref(false);
@@ -24,7 +24,11 @@ function resetDraft() {
         0,
         Math.round((Date.parse(entry.end) - Date.parse(entry.start)) / 1000)
     );
-    draft.value = `${String(Math.floor(seconds / 3600)).padStart(2, '0')}:${String(Math.floor(seconds / 60) % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+    draft.value = formatHumanReadableDuration(
+        seconds,
+        props.context.organization?.interval_format,
+        props.context.organization?.number_format
+    );
     initial = draft.value;
     error.value = '';
     void nextTick(() => {
@@ -95,8 +99,21 @@ async function save() {
 </script>
 
 <template>
-    <div ref="container" class="min-w-0" @keydown.esc.prevent.stop="cancel">
+    <div ref="container" class="w-full min-w-0 flex-1" @keydown.esc.prevent.stop="cancel">
         <template v-if="editing">
+            <input
+                v-if="originals.length"
+                ref="input"
+                v-model="draft"
+                type="text"
+                aria-label="Duration"
+                placeholder="hh:mm:ss"
+                :disabled="busy"
+                :aria-invalid="Boolean(error)"
+                class="duration-control bg-input-background border-input-border focus:outline-none focus:ring-2 focus:ring-inset focus:ring-input-select-active"
+                @keydown.enter.prevent="save"
+                @blur="handleBlur" />
+            <span v-else-if="busy" role="status" class="text-xs">Loading…</span>
             <select
                 v-if="originals.length > 1"
                 v-model="selectedId"
@@ -108,19 +125,7 @@ async function save() {
                     {{ getLocalizedDayJs(entry.start).format('YYYY-MM-DD HH:mm') }}
                 </option>
             </select>
-            <input
-                v-if="originals.length"
-                ref="input"
-                v-model="draft"
-                type="text"
-                aria-label="Duration"
-                placeholder="hh:mm:ss"
-                :disabled="busy"
-                :aria-invalid="Boolean(error)"
-                class="w-full min-w-0 min-h-11 rounded border border-input-border bg-input-background px-2 text-sm font-semibold tabular-nums focus:outline-none focus:ring-2 focus:ring-input-select-active"
-                @keydown.enter.prevent="save"
-                @blur="handleBlur" />
-            <span v-else-if="busy" role="status" class="text-xs">Loading…</span>
+
             <button
                 v-if="error && !originals.length"
                 type="button"
@@ -135,9 +140,15 @@ async function save() {
             type="button"
             data-edit-field="duration"
             aria-label="Edit duration"
-            class="min-h-11 w-full rounded px-1 -mx-1 text-start hover:bg-card-background-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-input-select-active"
+            class="duration-control flex items-center border-transparent hover:bg-card-background-active focus-visible:outline focus-visible:outline-2 focus-visible:outline-input-select-active"
             @click="begin">
             <slot />
         </button>
     </div>
 </template>
+
+<style scoped>
+.duration-control {
+    @apply box-border h-11 w-full min-w-0 rounded border px-1 py-0 text-left text-sm font-medium leading-5;
+}
+</style>
