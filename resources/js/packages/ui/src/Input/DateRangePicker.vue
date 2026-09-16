@@ -170,6 +170,14 @@ const presets: DatePreset[] = [
             end: getLocalizedDayJs().subtract(1, 'year').endOf('year'),
         }),
     },
+    {
+        key: 'all-time',
+        label: 'All time',
+        range: () => ({
+            start: getLocalizedDayJs('2000-01-01').startOf('day'),
+            end: getLocalizedDayJs().endOf('day'),
+        }),
+    },
 ];
 
 const selectedPreset = computed(() => {
