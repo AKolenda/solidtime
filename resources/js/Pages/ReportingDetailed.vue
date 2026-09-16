@@ -71,11 +71,18 @@ const endDate = useSessionStorage<string>(
     'reporting-end-date',
     getLocalizedDayJs(getDayJsInstance()().format()).format()
 );
+// Deep links such as the client list pass ?client=<id>&range=all.
+const pageQuery = new URLSearchParams(window.location.search);
+const linkedClientId = pageQuery.get('client');
+if (pageQuery.get('range') === 'all') {
+    startDate.value = getLocalizedDayJs('2000-01-01').startOf('day').format();
+    endDate.value = getLocalizedDayJs().endOf('day').format();
+}
 const selectedTags = ref<string[]>([]);
 const selectedProjects = ref<string[]>([]);
 const selectedMembers = ref<string[]>([]);
 const selectedTasks = ref<string[]>([]);
-const selectedClients = ref<string[]>([]);
+const selectedClients = ref<string[]>(linkedClientId ? [linkedClientId] : []);
 const tagMatchType = ref<TagMatchType>('contains');
 const billable = ref<'true' | 'false' | null>(null);
 const entryType = ref<'work' | 'break' | null>('work');

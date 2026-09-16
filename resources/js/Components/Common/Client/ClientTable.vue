@@ -8,6 +8,8 @@ import ClientTableRow from '@/Components/Common/Client/ClientTableRow.vue';
 import ClientCreateModal from '@/Components/Common/Client/ClientCreateModal.vue';
 import ClientTableHeading from '@/Components/Common/Client/ClientTableHeading.vue';
 import Pagination from '@/Components/Common/Pagination.vue';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/packages/ui/src';
+import { useStorage } from '@vueuse/core';
 import { canCreateClients } from '@/utils/permissions';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import {
@@ -106,17 +108,38 @@ const sortedClients = computed(() => {
 });
 
 // Client-side pagination: the full list is in memory, only one page is mounted at a time.
-const PAGE_SIZE = 15;
+type ClientPageSize = '25' | '50' | '100' | 'all';
+const pageSize = useStorage<ClientPageSize>('client-table-page-size', '25');
 const currentPage = ref(1);
 
-watch([() => props.sortColumn, () => props.sortDirection, () => props.clients], () => {
-    currentPage.value = 1;
+const itemsPerPage = computed(() => {
+    if (pageSize.value === 'all') {
+        return Math.max(sortedClients.value.length, 1);
+    }
+
+    return Number(pageSize.value);
 });
 
+// Editing a client refetches the list as a new array; only a change in membership
+// (tab switch, archive, delete) should send the user back to page 1.
+watch(
+    [() => props.sortColumn, () => props.sortDirection, () => props.clients.length, pageSize],
+    () => {
+        currentPage.value = 1;
+    }
+);
+
 const paginatedClients = computed(() => {
-    const start = (currentPage.value - 1) * PAGE_SIZE;
-    return sortedClients.value.slice(start, start + PAGE_SIZE);
+    const start = (currentPage.value - 1) * itemsPerPage.value;
+    return sortedClients.value.slice(start, start + itemsPerPage.value);
 });
+
+const firstVisibleClient = computed(() =>
+    sortedClients.value.length === 0 ? 0 : (currentPage.value - 1) * itemsPerPage.value + 1
+);
+const lastVisibleClient = computed(() =>
+    Math.min(currentPage.value * itemsPerPage.value, sortedClients.value.length)
+);
 </script>
 
 <template>
@@ -149,8 +172,36 @@ const paginatedClients = computed(() => {
             </div>
         </div>
     </div>
-    <Pagination
-        v-model:page="currentPage"
-        :total="sortedClients.length"
-        :items-per-page="PAGE_SIZE"></Pagination>
+    <div
+        v-if="sortedClients.length > 0"
+        class="grid grid-cols-1 items-center gap-3 px-4 py-4 sm:grid-cols-[1fr_auto_1fr] sm:px-6">
+        <div class="flex items-center gap-2 text-sm text-text-secondary">
+            <span class="whitespace-nowrap">Clients per page</span>
+            <Select v-model="pageSize">
+                <SelectTrigger
+                    aria-label="Clients per page"
+                    data-testid="client_page_size"
+                    class="h-9 w-[82px] bg-card-background">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
+
+        <Pagination
+            v-model:page="currentPage"
+            class="!w-auto !py-0"
+            :total="sortedClients.length"
+            :items-per-page="itemsPerPage"></Pagination>
+
+        <p class="text-sm text-text-secondary sm:text-right">
+            Showing {{ firstVisibleClient }}–{{ lastVisibleClient }} of
+            {{ sortedClients.length }}
+        </p>
+    </div>
 </template>

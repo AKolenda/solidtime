@@ -48,7 +48,7 @@ const showEditModal = ref(false);
 <template>
     <ContextMenu>
         <ContextMenuTrigger as-child>
-            <TableRow>
+            <TableRow :href="route('reporting.detailed', { client: client.id, range: 'all' })">
                 <ClientEditModal v-model:show="showEditModal" :client="client"></ClientEditModal>
                 <div
                     class="whitespace-nowrap flex items-center space-x-5 py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12">

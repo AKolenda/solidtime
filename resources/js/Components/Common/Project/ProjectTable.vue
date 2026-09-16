@@ -163,9 +163,12 @@ const itemsPerPage = computed(() => {
     return Number(pageSize.value);
 });
 
-watch([() => props.sortColumn, () => props.sortDirection, () => props.projects, pageSize], () => {
-    currentPage.value = 1;
-});
+watch(
+    [() => props.sortColumn, () => props.sortDirection, () => props.projects.length, pageSize],
+    () => {
+        currentPage.value = 1;
+    }
+);
 
 const paginatedProjects = computed(() => {
     const start = (currentPage.value - 1) * itemsPerPage.value;
