@@ -5,6 +5,7 @@ import { CheckCircleIcon, ArchiveBoxIcon, LockClosedIcon } from '@heroicons/vue/
 import {
     PencilSquareIcon,
     ArchiveBoxIcon as ArchiveBoxIconSolid,
+    ArrowDownOnSquareStackIcon,
     LockOpenIcon,
     TrashIcon,
 } from '@heroicons/vue/20/solid';
@@ -13,6 +14,7 @@ import ClientMoreOptionsDropdown from '@/Components/Common/Client/ClientMoreOpti
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import TableRow from '@/Components/TableRow.vue';
 import ClientEditModal from '@/Components/Common/Client/ClientEditModal.vue';
+import ClientMergeModal from '@/Components/Common/Client/ClientMergeModal.vue';
 import { canUpdateClients, canDeleteClients } from '@/utils/permissions';
 import {
     ContextMenu,
@@ -51,6 +53,7 @@ function reopenClient() {
 }
 
 const showEditModal = ref(false);
+const showMergeModal = ref(false);
 </script>
 
 <template>
@@ -58,6 +61,7 @@ const showEditModal = ref(false);
         <ContextMenuTrigger as-child>
             <TableRow :href="route('reporting.detailed', { client: client.id, range: 'all' })">
                 <ClientEditModal v-model:show="showEditModal" :client="client"></ClientEditModal>
+                <ClientMergeModal v-model:show="showMergeModal" :client="client"></ClientMergeModal>
                 <div
                     class="whitespace-nowrap flex items-center space-x-5 py-4 pr-3 text-sm font-medium text-text-primary pl-4 sm:pl-6 lg:pl-8 3xl:pl-12">
                     <span>
@@ -88,6 +92,7 @@ const showEditModal = ref(false);
                     <ClientMoreOptionsDropdown
                         :client="client"
                         @edit="showEditModal = true"
+                        @merge="showMergeModal = true"
                         @reopen="reopenClient"
                         @archive="archiveClient"
                         @delete="deleteClient"></ClientMoreOptionsDropdown>
@@ -101,6 +106,13 @@ const showEditModal = ref(false);
                 @select="showEditModal = true">
                 <PencilSquareIcon class="w-4 h-4 text-icon-default" />
                 <span>Edit</span>
+            </ContextMenuItem>
+            <ContextMenuItem
+                v-if="canUpdateClients()"
+                class="space-x-3"
+                @select="showMergeModal = true">
+                <ArrowDownOnSquareStackIcon class="w-4 h-4 text-icon-default" />
+                <span>Merge</span>
             </ContextMenuItem>
             <ContextMenuItem
                 v-if="canUpdateClients() && client.is_closed"

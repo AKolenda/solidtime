@@ -163,6 +163,7 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::post('/clients', [ClientController::class, 'store'])->name('store')->middleware('check-organization-blocked');
             Route::put('/clients/{client}', [ClientController::class, 'update'])->name('update')->middleware('check-organization-blocked');
             Route::delete('/clients/{client}', [ClientController::class, 'destroy'])->name('destroy');
+            Route::post('/clients/{client}/merge-into', [ClientController::class, 'mergeInto'])->name('merge-into')->middleware('check-organization-blocked');
         });
 
         // Task routes

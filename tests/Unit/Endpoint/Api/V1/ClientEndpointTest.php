@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ClientController;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\Report;
 use Illuminate\Support\Carbon;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Passport\Passport;
@@ -565,5 +566,214 @@ class ClientEndpointTest extends ApiEndpointTestAbstract
         $this->assertDatabaseMissing(Client::class, [
             'id' => $client->getKey(),
         ]);
+    }
+
+    public function test_merge_into_fails_if_user_has_no_permission_to_update_clients(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission();
+        $source = Client::factory()->forOrganization($data->organization)->create();
+        $destination = Client::factory()->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $destination->getKey(),
+        ]);
+
+        // Assert
+        $response->assertForbidden();
+        $this->assertDatabaseHas(Client::class, [
+            'id' => $source->getKey(),
+        ]);
+    }
+
+    public function test_merge_into_fails_if_source_client_is_not_part_of_organization(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->create();
+        $destination = Client::factory()->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $destination->getKey(),
+        ]);
+
+        // Assert
+        $response->assertForbidden();
+    }
+
+    public function test_merge_into_returns_validation_error_if_destination_does_not_belong_to_organization(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create();
+        $destination = Client::factory()->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $source->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrorFor('client_id');
+    }
+
+    public function test_merge_into_returns_validation_error_if_destination_is_the_source_client(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $source->getKey(),
+            'name_client_id' => $source->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrorFor('client_id');
+    }
+
+    public function test_merge_into_returns_validation_error_if_name_client_is_not_one_of_the_merged_clients(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create();
+        $destination = Client::factory()->forOrganization($data->organization)->create();
+        $other = Client::factory()->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $other->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrorFor('name_client_id');
+    }
+
+    public function test_merge_into_moves_projects_deletes_source_and_keeps_destination_name(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create([
+            'name' => 'CC',
+        ]);
+        $destination = Client::factory()->forOrganization($data->organization)->create([
+            'name' => 'Compact Impression',
+        ]);
+        $sourceProject = Project::factory()->forOrganization($data->organization)->forClient($source)->create();
+        $destinationProject = Project::factory()->forOrganization($data->organization)->forClient($destination)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $destination->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(204);
+        $this->assertSame('', $response->getContent());
+        $this->assertDatabaseMissing(Client::class, [
+            'id' => $source->getKey(),
+        ]);
+        $this->assertDatabaseHas(Client::class, [
+            'id' => $destination->getKey(),
+            'name' => 'Compact Impression',
+        ]);
+        $this->assertDatabaseHas(Project::class, [
+            'id' => $sourceProject->getKey(),
+            'client_id' => $destination->getKey(),
+        ]);
+        $this->assertDatabaseHas(Project::class, [
+            'id' => $destinationProject->getKey(),
+            'client_id' => $destination->getKey(),
+        ]);
+    }
+
+    public function test_merge_into_renames_destination_when_source_name_is_kept(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create([
+            'name' => 'CC',
+        ]);
+        $destination = Client::factory()->forOrganization($data->organization)->create([
+            'name' => 'Compact Impression',
+        ]);
+        $sourceProject = Project::factory()->forOrganization($data->organization)->forClient($source)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $source->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(204);
+        $this->assertDatabaseMissing(Client::class, [
+            'id' => $source->getKey(),
+        ]);
+        $this->assertDatabaseHas(Client::class, [
+            'id' => $destination->getKey(),
+            'name' => 'CC',
+        ]);
+        $this->assertDatabaseHas(Project::class, [
+            'id' => $sourceProject->getKey(),
+            'client_id' => $destination->getKey(),
+        ]);
+    }
+
+    public function test_merge_into_rewrites_saved_report_client_filters_to_the_destination(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create();
+        $destination = Client::factory()->forOrganization($data->organization)->create();
+        $report = Report::factory()->forOrganization($data->organization)->create();
+        $properties = $report->properties;
+        $properties->setClientIds([$source->getKey(), $destination->getKey()]);
+        $report->properties = $properties;
+        $report->save();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $destination->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(204);
+        $report->refresh();
+        $this->assertSame([$destination->getKey()], $report->properties->clientIds?->values()->all());
     }
 }

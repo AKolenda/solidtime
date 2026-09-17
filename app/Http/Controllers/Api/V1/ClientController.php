@@ -6,12 +6,14 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Exceptions\Api\EntityStillInUseApiException;
 use App\Http\Requests\V1\Client\ClientIndexRequest;
+use App\Http\Requests\V1\Client\ClientMergeIntoRequest;
 use App\Http\Requests\V1\Client\ClientStoreRequest;
 use App\Http\Requests\V1\Client\ClientUpdateRequest;
 use App\Http\Resources\V1\Client\ClientCollection;
 use App\Http\Resources\V1\Client\ClientResource;
 use App\Models\Client;
 use App\Models\Organization;
+use App\Service\ClientService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
@@ -22,7 +24,7 @@ class ClientController extends Controller
     {
         parent::checkPermission($organization, $permission);
         if ($client !== null && $client->organization_id !== $organization->getKey()) {
-            throw new AuthorizationException('Tag does not belong to organization');
+            throw new AuthorizationException('Client does not belong to organization');
         }
     }
 
@@ -121,6 +123,26 @@ class ClientController extends Controller
         }
 
         $client->delete();
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Merge one client into another
+     *
+     * Projects of the source client are moved onto the destination client.
+     * The destination keeps whichever of the two names is selected, and the source is deleted.
+     *
+     * @throws AuthorizationException
+     *
+     * @operationId mergeClient
+     */
+    public function mergeInto(Organization $organization, Client $client, ClientMergeIntoRequest $request, ClientService $clientService): JsonResponse
+    {
+        $this->checkPermission($organization, 'clients:update', $client);
+
+        $destination = Client::findOrFail($request->getClientId());
+        $clientService->mergeInto($organization, $client, $destination, $request->getNameClientId());
 
         return response()->json(null, 204);
     }

@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { ArchiveBoxIcon, LockOpenIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/20/solid';
+import {
+    ArchiveBoxIcon,
+    ArrowDownOnSquareStackIcon,
+    LockOpenIcon,
+    PencilSquareIcon,
+    TrashIcon,
+} from '@heroicons/vue/20/solid';
 import type { Client } from '@/packages/api/src';
 import { canDeleteClients, canUpdateClients } from '@/utils/permissions';
 import {
@@ -12,6 +18,7 @@ import {
 const emit = defineEmits<{
     delete: [];
     edit: [];
+    merge: [];
     archive: [];
     reopen: [];
 }>();
@@ -49,6 +56,15 @@ const props = defineProps<{
                 @click="emit('edit')">
                 <PencilSquareIcon class="w-5 text-icon-active" />
                 <span>Edit</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                v-if="canUpdateClients()"
+                :aria-label="'Merge Client ' + props.client.name"
+                data-testid="client_merge"
+                class="flex items-center space-x-3 cursor-pointer"
+                @click="emit('merge')">
+                <ArrowDownOnSquareStackIcon class="w-5 text-icon-active" />
+                <span>Merge</span>
             </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canUpdateClients() && client.is_closed"

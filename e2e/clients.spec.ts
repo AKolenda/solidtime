@@ -107,6 +107,54 @@ test('test that editing a client name works', async ({ page, ctx }) => {
     await expect(page.getByTestId('client_table')).not.toContainText(originalName);
 });
 
+test('test that merging clients moves projects and keeps the chosen name', async ({
+    page,
+    ctx,
+}) => {
+    const suffix = Math.floor(1 + Math.random() * 10000);
+    const shortName = 'CC ' + suffix;
+    const fullName = 'Compact Impression ' + suffix;
+    const shortClient = await createClientViaApi(ctx, { name: shortName });
+    const fullClient = await createClientViaApi(ctx, { name: fullName });
+    await createProjectViaApi(ctx, { name: 'Short Project ' + suffix, client_id: shortClient.id });
+    await createProjectViaApi(ctx, { name: 'Full Project ' + suffix, client_id: fullClient.id });
+
+    await goToClientsOverview(page);
+    await expect(page.getByTestId('client_table')).toContainText(shortName);
+    await expect(page.getByTestId('client_table')).toContainText(fullName);
+
+    const moreButton = page.locator("[aria-label='Actions for Client " + shortName + "']");
+    await moreButton.click();
+    await page.getByTestId('client_merge').click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Merge Clients' })).toBeVisible();
+
+    await page.getByRole('dialog').getByRole('button', { name: 'Select a client...' }).click();
+    const targetOption = page.getByRole('option', { name: fullName });
+    await expect(targetOption).toBeVisible({ timeout: 10000 });
+    await targetOption.click();
+
+    await page.getByRole('dialog').getByRole('radio', { name: fullName }).click();
+
+    await Promise.all([
+        page.getByRole('button', { name: 'Merge Clients' }).click(),
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/clients/') &&
+                response.url().includes('/merge-into') &&
+                response.request().method() === 'POST' &&
+                response.status() === 204
+        ),
+    ]);
+
+    await expect(page.getByRole('dialog').filter({ hasText: 'Merge Clients' })).not.toBeVisible();
+    await expect(page.getByTestId('client_table')).not.toContainText(shortName);
+    await expect(page.getByTestId('client_table')).toContainText(fullName);
+    await expect(
+        page.getByRole('row').filter({ hasText: fullName }).getByText('2 Projects')
+    ).toBeVisible();
+});
+
 test('test that deleting a client via actions menu works', async ({ page, ctx }) => {
     const clientName = 'DeleteMe Client ' + Math.floor(1 + Math.random() * 10000);
 
