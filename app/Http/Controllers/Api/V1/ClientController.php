@@ -43,6 +43,7 @@ class ClientController extends Controller
 
         $clientsQuery = Client::query()
             ->whereBelongsTo($organization, 'organization')
+            ->withMax('projects', 'created_at')
             ->orderBy('created_at', 'desc')
             ->orderBy('id');
 
@@ -95,6 +96,9 @@ class ClientController extends Controller
         $client->name = $request->input('name');
         if ($request->has('is_archived')) {
             $client->archived_at = $request->getIsArchived() ? Carbon::now() : null;
+        }
+        if ($request->has('is_closed')) {
+            $client->reopened_at = $request->getIsClosed() ? null : Carbon::now();
         }
         $client->save();
 

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { Client } from '@/packages/api/src';
 import { computed, ref } from 'vue';
-import { CheckCircleIcon, ArchiveBoxIcon } from '@heroicons/vue/24/outline';
+import { CheckCircleIcon, ArchiveBoxIcon, LockClosedIcon } from '@heroicons/vue/24/outline';
 import {
     PencilSquareIcon,
     ArchiveBoxIcon as ArchiveBoxIconSolid,
+    LockOpenIcon,
     TrashIcon,
 } from '@heroicons/vue/20/solid';
 import { useClientsStore } from '@/utils/useClients';
@@ -42,6 +43,13 @@ function archiveClient() {
     });
 }
 
+function reopenClient() {
+    useClientsStore().updateClient(props.client.id, {
+        ...props.client,
+        is_closed: false,
+    });
+}
+
 const showEditModal = ref(false);
 </script>
 
@@ -66,6 +74,10 @@ const showEditModal = ref(false);
                         <ArchiveBoxIcon class="w-4 text-icon-default"></ArchiveBoxIcon>
                         <span>Archived</span>
                     </template>
+                    <template v-else-if="client.is_closed">
+                        <LockClosedIcon class="w-4 text-icon-default"></LockClosedIcon>
+                        <span>Closed</span>
+                    </template>
                     <template v-else>
                         <CheckCircleIcon class="w-4 text-icon-default"></CheckCircleIcon>
                         <span>Active</span>
@@ -76,6 +88,7 @@ const showEditModal = ref(false);
                     <ClientMoreOptionsDropdown
                         :client="client"
                         @edit="showEditModal = true"
+                        @reopen="reopenClient"
                         @archive="archiveClient"
                         @delete="deleteClient"></ClientMoreOptionsDropdown>
                 </div>
@@ -88,6 +101,13 @@ const showEditModal = ref(false);
                 @select="showEditModal = true">
                 <PencilSquareIcon class="w-4 h-4 text-icon-default" />
                 <span>Edit</span>
+            </ContextMenuItem>
+            <ContextMenuItem
+                v-if="canUpdateClients() && client.is_closed"
+                class="space-x-3"
+                @select="reopenClient()">
+                <LockOpenIcon class="w-4 h-4 text-icon-default" />
+                <span>Reopen</span>
             </ContextMenuItem>
             <ContextMenuItem v-if="canUpdateClients()" class="space-x-3" @select="archiveClient()">
                 <ArchiveBoxIconSolid class="w-4 h-4 text-icon-default" />

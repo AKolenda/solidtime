@@ -29,13 +29,18 @@ const ClientResource = z
         id: z.string(),
         name: z.string(),
         is_archived: z.boolean(),
+        is_closed: z.boolean(),
         created_at: z.string(),
         updated_at: z.string(),
     })
     .passthrough();
 const ClientStoreRequest = z.object({ name: z.string().min(1).max(255) }).passthrough();
 const ClientUpdateRequest = z
-    .object({ name: z.string().min(1).max(255), is_archived: z.boolean().optional() })
+    .object({
+        name: z.string().min(1).max(255),
+        is_archived: z.boolean().optional(),
+        is_closed: z.boolean().optional(),
+    })
     .passthrough();
 const DestroyWithPasswordRequest = z.object({ password: z.string() }).passthrough();
 const ImportRequest = z.object({ type: z.string(), data: z.string() }).passthrough();

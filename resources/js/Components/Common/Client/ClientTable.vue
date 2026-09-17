@@ -68,7 +68,7 @@ const columns = computed(() => [
     },
     {
         id: 'status',
-        accessorFn: (row: Client) => (row.is_archived ? 1 : 0),
+        accessorFn: (row: Client) => (row.is_archived ? 2 : row.is_closed ? 1 : 0),
     },
 ]);
 

@@ -39,6 +39,10 @@ class ClientUpdateRequest extends BaseFormRequest
             'is_archived' => [
                 'boolean',
             ],
+            // Set to false to reopen a client that closed automatically
+            'is_closed' => [
+                'boolean',
+            ],
         ];
     }
 
@@ -47,5 +51,12 @@ class ClientUpdateRequest extends BaseFormRequest
         assert($this->has('is_archived'));
 
         return (bool) $this->input('is_archived');
+    }
+
+    public function getIsClosed(): bool
+    {
+        assert($this->has('is_closed'));
+
+        return (bool) $this->input('is_closed');
     }
 }

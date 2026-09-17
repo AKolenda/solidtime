@@ -22,6 +22,8 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property string $organization_id
  * @property-read bool $is_archived
  * @property Carbon|null $archived_at
+ * @property Carbon|null $reopened_at
+ * @property-read bool $is_closed
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Organization $organization
@@ -45,7 +47,10 @@ class Client extends Model implements AuditableContract
     protected $casts = [
         'name' => 'string',
         'archived_at' => 'datetime',
+        'reopened_at' => 'datetime',
     ];
+
+    public const int CLOSED_AFTER_MONTHS = 12;
 
     /**
      * @return BelongsTo<Organization, $this>
@@ -82,6 +87,35 @@ class Client extends Model implements AuditableContract
     {
         return Attribute::make(
             get: fn (mixed $value, array $attributes) => isset($attributes['archived_at']),
+        );
+    }
+
+    /**
+     * A client closes automatically once no project has been created for it in the last
+     * CLOSED_AFTER_MONTHS. Creating or reopening the client restarts that clock.
+     * Archiving is manual and takes precedence.
+     *
+     * @return Attribute<bool, never>
+     */
+    protected function isClosed(): Attribute
+    {
+        return Attribute::make(
+            get: function (): bool {
+                if ($this->is_archived) {
+                    return false;
+                }
+                $latestProjectAt = array_key_exists('projects_max_created_at', $this->attributes)
+                    ? $this->attributes['projects_max_created_at']
+                    : $this->projects()->max('created_at');
+                $lastActivityAt = collect([
+                    $this->created_at,
+                    $this->reopened_at,
+                    $latestProjectAt !== null ? Carbon::parse($latestProjectAt) : null,
+                ])->filter()->max();
+
+                return $lastActivityAt !== null
+                    && $lastActivityAt->lt(Carbon::now()->subMonths(self::CLOSED_AFTER_MONTHS));
+            },
         );
     }
 }

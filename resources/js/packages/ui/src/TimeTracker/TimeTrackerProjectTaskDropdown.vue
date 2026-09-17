@@ -209,6 +209,7 @@ function addProjectToFilterObject(
             updated_at: '',
             value: '',
             is_archived: false,
+            is_closed: false,
             projects: [newProject],
         });
     }
@@ -226,6 +227,7 @@ function updateFilteredResults() {
             updated_at: '',
             value: '',
             is_archived: false,
+            is_closed: false,
             projects: [
                 {
                     id: NO_PROJECT_ID,

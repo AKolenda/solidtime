@@ -16,7 +16,8 @@ import type { SortColumn, SortDirection } from '@/Components/Common/Client/Clien
 
 const { clients } = useClientsQuery();
 
-const activeTab = ref<'active' | 'archived'>('active');
+type ClientTab = 'active' | 'closed' | 'archived';
+const activeTab = ref<ClientTab>('active');
 
 const createClient = ref(false);
 
@@ -42,10 +43,13 @@ function handleSort(column: SortColumn, direction: SortDirection) {
 
 const shownClients = computed(() => {
     return clients.value.filter((client) => {
-        if (activeTab.value === 'active') {
-            return !client.is_archived;
+        if (activeTab.value === 'archived') {
+            return client.is_archived;
         }
-        return client.is_archived;
+        if (activeTab.value === 'closed') {
+            return client.is_closed;
+        }
+        return !client.is_archived && !client.is_closed;
     });
 });
 </script>
@@ -58,6 +62,7 @@ const shownClients = computed(() => {
                 <PageTitle :icon="UserCircleIcon" title="Clients"> </PageTitle>
                 <TabBar v-model="activeTab">
                     <TabBarItem value="active">Active</TabBarItem>
+                    <TabBarItem value="closed">Closed</TabBarItem>
                     <TabBarItem value="archived"> Archived </TabBarItem>
                 </TabBar>
             </div>

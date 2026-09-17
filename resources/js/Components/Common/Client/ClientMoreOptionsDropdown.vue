@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArchiveBoxIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/20/solid';
+import { ArchiveBoxIcon, LockOpenIcon, PencilSquareIcon, TrashIcon } from '@heroicons/vue/20/solid';
 import type { Client } from '@/packages/api/src';
 import { canDeleteClients, canUpdateClients } from '@/utils/permissions';
 import {
@@ -13,6 +13,7 @@ const emit = defineEmits<{
     delete: [];
     edit: [];
     archive: [];
+    reopen: [];
 }>();
 const props = defineProps<{
     client: Client;
@@ -48,6 +49,15 @@ const props = defineProps<{
                 @click="emit('edit')">
                 <PencilSquareIcon class="w-5 text-icon-active" />
                 <span>Edit</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+                v-if="canUpdateClients() && client.is_closed"
+                :aria-label="'Reopen Client ' + props.client.name"
+                data-testid="client_reopen"
+                class="flex items-center space-x-3 cursor-pointer"
+                @click.prevent="emit('reopen')">
+                <LockOpenIcon class="w-5 text-icon-active" />
+                <span>Reopen</span>
             </DropdownMenuItem>
             <DropdownMenuItem
                 v-if="canUpdateClients()"

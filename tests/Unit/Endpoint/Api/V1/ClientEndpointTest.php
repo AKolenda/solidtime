@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ClientController;
 use App\Models\Client;
 use App\Models\Organization;
 use App\Models\Project;
+use Illuminate\Support\Carbon;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Passport\Passport;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -379,6 +380,62 @@ class ClientEndpointTest extends ApiEndpointTestAbstract
             'name' => $clientFake->name,
             'organization_id' => $data->organization->getKey(),
         ]);
+    }
+
+    public function test_index_endpoint_marks_clients_without_recent_projects_as_closed(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:view',
+            'clients:view:all',
+        ]);
+        $staleClient = Client::factory()->forOrganization($data->organization)->create(['created_at' => Carbon::now()->subMonths(18)]);
+        Project::factory()->forOrganization($data->organization)->forClient($staleClient)->create(['created_at' => Carbon::now()->subMonths(14)]);
+        $activeClient = Client::factory()->forOrganization($data->organization)->create(['created_at' => Carbon::now()->subMonths(18)]);
+        Project::factory()->forOrganization($data->organization)->forClient($activeClient)->create(['created_at' => Carbon::now()->subMonths(2)]);
+        $reopenedClient = Client::factory()->forOrganization($data->organization)->create(['created_at' => Carbon::now()->subMonths(18), 'reopened_at' => Carbon::now()->subDay()]);
+        $newClient = Client::factory()->forOrganization($data->organization)->create();
+        $archivedStaleClient = Client::factory()->forOrganization($data->organization)->archived()->create(['created_at' => Carbon::now()->subMonths(18)]);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.clients.index', [$data->organization->getKey(), 'archived' => 'all']));
+
+        // Assert
+        $response->assertStatus(200);
+        $closedById = collect($response->json('data'))->pluck('is_closed', 'id');
+        $this->assertTrue($closedById[$staleClient->getKey()]);
+        $this->assertFalse($closedById[$activeClient->getKey()]);
+        $this->assertFalse($closedById[$reopenedClient->getKey()]);
+        $this->assertFalse($closedById[$newClient->getKey()]);
+        $this->assertFalse($closedById[$archivedStaleClient->getKey()]);
+    }
+
+    public function test_update_endpoint_can_reopen_a_closed_client(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $client = Client::factory()->forOrganization($data->organization)->create(['created_at' => Carbon::now()->subMonths(18)]);
+        $this->assertTrue($client->is_closed);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.clients.update', [$data->organization->getKey(), $client->getKey()]), [
+            'name' => $client->name,
+            'is_closed' => false,
+        ]);
+
+        // Assert
+        $response->assertStatus(200);
+        $response->assertJson(fn (AssertableJson $json) => $json
+            ->has('data')
+            ->where('data.is_closed', false)
+        );
+        $client->refresh();
+        $this->assertNotNull($client->reopened_at);
+        $this->assertFalse($client->is_closed);
     }
 
     public function test_update_endpoint_can_archive_a_client(): void
