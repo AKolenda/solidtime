@@ -75,7 +75,8 @@ RUN apt-get update; \
     unzip \
     ncdu \
     procps \
-    postgresql-client \n    ca-certificates \
+    postgresql-client \
+    ca-certificates \
     supervisor \
     libsodium-dev \
 #    && curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr bash \
