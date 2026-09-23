@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Exceptions\Api\EntityStillInUseApiException;
 use App\Http\Requests\V1\Tag\TagIndexRequest;
 use App\Http\Requests\V1\Tag\TagStoreRequest;
 use App\Http\Requests\V1\Tag\TagUpdateRequest;
@@ -15,6 +14,7 @@ use App\Models\Tag;
 use App\Models\TimeEntry;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class TagController extends Controller
 {
@@ -87,7 +87,7 @@ class TagController extends Controller
     /**
      * Delete tag
      *
-     * @throws AuthorizationException|EntityStillInUseApiException
+     * @throws AuthorizationException
      *
      * @operationId deleteTag
      */
@@ -95,11 +95,16 @@ class TagController extends Controller
     {
         $this->checkPermission($organization, 'tags:delete', $tag);
 
-        if (TimeEntry::query()->hasTag($tag)->whereBelongsTo($organization, 'organization')->exists()) {
-            throw new EntityStillInUseApiException('tag', 'time_entry');
-        }
+        DB::transaction(function () use ($organization, $tag): void {
+            // Detach the tag from its time entries instead of refusing the delete.
+            TimeEntry::query()
+                ->whereBelongsTo($organization, 'organization')
+                ->hasTag($tag)
+                ->toBase()
+                ->update(['tags' => DB::raw("tags - '".$tag->getKey()."'")]);
 
-        $tag->delete();
+            $tag->delete();
+        });
 
         return response()->json(null, 204);
     }
