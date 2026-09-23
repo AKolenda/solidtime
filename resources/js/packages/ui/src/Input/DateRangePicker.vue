@@ -6,22 +6,22 @@ import { CalendarDate } from '@internationalized/date';
 import { CalendarIcon, Check } from '@lucide/vue';
 import { computed, ref, inject, type ComputedRef, watch } from 'vue';
 import { twMerge } from 'tailwind-merge';
-import {
-    getDayJsInstance,
-    getLocalizedDayJs,
-    firstDayIndex,
-    type WeekStartDay,
-} from '@/packages/ui/src/utils/time';
+import DateRangeNavigator from './DateRangeNavigator.vue';
+import { getLocalizedDayJs, firstDayIndex, type WeekStartDay } from '@/packages/ui/src/utils/time';
+import { getDateRangeLabel, shiftDateRange, type DateRangeDirection } from '../utils/dateRange';
 import { type Organization } from '@/packages/api/src';
 import { getUserTimezone } from '@/packages/ui/src/utils/settings';
-import { formatDate } from '@/packages/ui/src/utils/time';
 
 const weekStartsOn = computed((): WeekStartDay => firstDayIndex.value as WeekStartDay);
 
-const props = defineProps<{
-    start: string;
-    end: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        start: string;
+        end: string;
+        allowFuture?: boolean;
+    }>(),
+    { allowFuture: false }
+);
 
 const emit = defineEmits<{
     (e: 'update:start', value: string): void;
@@ -35,9 +35,12 @@ interface CalendarDateRange {
 }
 
 const today = computed(() => {
-    const now = getDayJsInstance()();
+    const now = getLocalizedDayJs();
     return new CalendarDate(now.year(), now.month() + 1, now.date());
 });
+
+const startDay = computed(() => (props.start ? getLocalizedDayJs(props.start) : undefined));
+const endDay = computed(() => (props.end ? getLocalizedDayJs(props.end) : undefined));
 
 const modelValue = computed<CalendarDateRange>({
     get: () => ({
@@ -110,7 +113,7 @@ const presets: DatePreset[] = [
         key: 'last-14-days',
         label: 'Last 14 days',
         range: () => ({
-            start: getLocalizedDayJs().subtract(14, 'days'),
+            start: getLocalizedDayJs().subtract(13, 'days').startOf('day'),
             end: getLocalizedDayJs(),
         }),
     },
@@ -134,7 +137,7 @@ const presets: DatePreset[] = [
         key: 'last-30-days',
         label: 'Last 30 days',
         range: () => ({
-            start: getLocalizedDayJs().subtract(30, 'days'),
+            start: getLocalizedDayJs().subtract(29, 'days').startOf('day'),
             end: getLocalizedDayJs(),
         }),
     },
@@ -142,8 +145,8 @@ const presets: DatePreset[] = [
         key: 'last-90-days',
         label: 'Last 90 days',
         range: () => ({
-            start: getDayJsInstance()().subtract(90, 'days'),
-            end: getDayJsInstance()(),
+            start: getLocalizedDayJs().subtract(89, 'days').startOf('day'),
+            end: getLocalizedDayJs(),
         }),
     },
     {
@@ -203,6 +206,39 @@ function setPreset(preset: DatePreset) {
 
 const organization = inject<ComputedRef<Organization>>('organization');
 
+const displayLabel = computed(() => {
+    if (selectedPreset.value) return selectedPreset.value.label;
+    if (!startDay.value) return 'Pick a date';
+    if (!endDay.value) {
+        return getDateRangeLabel(startDay.value, startDay.value, {
+            dateFormat: organization?.value?.date_format,
+        });
+    }
+    return getDateRangeLabel(startDay.value, endDay.value, {
+        dateFormat: organization?.value?.date_format,
+    });
+});
+
+const nextRange = computed(() => {
+    if (!startDay.value || !endDay.value) return undefined;
+    return shiftDateRange(startDay.value, endDay.value, 1);
+});
+
+const nextDisabled = computed(
+    () =>
+        !props.allowFuture &&
+        !!nextRange.value &&
+        nextRange.value.start.isAfter(getLocalizedDayJs().endOf('day'))
+);
+
+function navigate(direction: DateRangeDirection) {
+    if (!startDay.value || !endDay.value) return;
+    const shifted = shiftDateRange(startDay.value, endDay.value, direction);
+    emit('update:start', shifted.start.format());
+    emit('update:end', shifted.end.format());
+    emit('submit');
+}
+
 watch(open, (value) => {
     if (value === false) {
         emit('submit');
@@ -211,66 +247,62 @@ watch(open, (value) => {
 </script>
 
 <template>
-    <Popover v-model:open="open">
-        <PopoverTrigger as-child>
-            <Button
-                variant="outline"
-                :class="
-                    twMerge(
-                        'flex w-full items-center justify-between whitespace-nowrap h-[34px] text-start',
-                        !modelValue && 'text-muted-foreground'
-                    )
-                ">
-                <CalendarIcon class="-ml-0.5 text-text-quaternary h-4 w-4" />
-                <template v-if="selectedPreset">
-                    {{ selectedPreset.label }}
-                </template>
-                <template v-else-if="modelValue.start">
-                    <template v-if="modelValue.end">
-                        {{ formatDate(modelValue.start.toString(), organization?.date_format) }}
-                        -
-                        {{ formatDate(modelValue.end.toString(), organization?.date_format) }}
-                    </template>
-                    <template v-else>
-                        {{ formatDate(modelValue.start.toString(), organization?.date_format) }}
-                    </template>
-                </template>
-                <template v-else> Pick a date </template>
-            </Button>
-        </PopoverTrigger>
-        <PopoverContent class="w-auto p-0">
-            <div class="flex divide-x divide-border-secondary">
-                <div
-                    class="text-text-primary text-sm flex flex-col space-y-0.5 items-start py-2 px-2">
+    <DateRangeNavigator
+        :label="displayLabel"
+        :next-disabled="nextDisabled"
+        previous-test-id="date_range_picker_previous"
+        trigger-test-id="date_range_picker_display"
+        next-test-id="date_range_picker_next"
+        @previous="navigate(-1)"
+        @next="navigate(1)">
+        <template #trigger="{ triggerClass }">
+            <Popover v-model:open="open">
+                <PopoverTrigger as-child>
                     <Button
-                        v-for="preset in presets"
-                        :key="preset.key"
+                        type="button"
                         variant="ghost"
                         size="sm"
-                        :aria-pressed="selectedPreset?.key === preset.key"
-                        :class="
-                            twMerge(
-                                'w-full justify-between',
-                                selectedPreset?.key === preset.key &&
-                                    'bg-card-background-active font-medium'
-                            )
-                        "
-                        @click="setPreset(preset)">
-                        <span>{{ preset.label }}</span>
-                        <Check
-                            v-if="selectedPreset?.key === preset.key"
-                            class="h-4 w-4 text-accent-500" />
+                        :class="twMerge(triggerClass, !modelValue.start && 'text-muted-foreground')"
+                        data-testid="date_range_picker_display">
+                        <CalendarIcon class="text-text-quaternary h-4 w-4 shrink-0" />
+                        <span class="min-w-0 truncate">{{ displayLabel }}</span>
                     </Button>
-                </div>
-                <div class="pl-2">
-                    <RangeCalendar
-                        v-model="modelValue"
-                        initial-focus
-                        :number-of-months="2"
-                        :max-value="today"
-                        :week-starts-on="weekStartsOn" />
-                </div>
-            </div>
-        </PopoverContent>
-    </Popover>
+                </PopoverTrigger>
+                <PopoverContent class="w-auto p-0">
+                    <div class="flex divide-x divide-border-secondary">
+                        <div
+                            class="text-text-primary text-sm flex flex-col space-y-0.5 items-start py-2 px-2">
+                            <Button
+                                v-for="preset in presets"
+                                :key="preset.key"
+                                variant="ghost"
+                                size="sm"
+                                :aria-pressed="selectedPreset?.key === preset.key"
+                                :class="
+                                    twMerge(
+                                        'w-full justify-between',
+                                        selectedPreset?.key === preset.key &&
+                                            'bg-card-background-active font-medium'
+                                    )
+                                "
+                                @click="setPreset(preset)">
+                                <span>{{ preset.label }}</span>
+                                <Check
+                                    v-if="selectedPreset?.key === preset.key"
+                                    class="h-4 w-4 text-accent-500" />
+                            </Button>
+                        </div>
+                        <div class="pl-2">
+                            <RangeCalendar
+                                v-model="modelValue"
+                                initial-focus
+                                :number-of-months="2"
+                                :max-value="allowFuture ? undefined : today"
+                                :week-starts-on="weekStartsOn" />
+                        </div>
+                    </div>
+                </PopoverContent>
+            </Popover>
+        </template>
+    </DateRangeNavigator>
 </template>

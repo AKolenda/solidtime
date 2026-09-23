@@ -44,7 +44,7 @@ class ClockifyProjectsImporter extends DefaultImporter
                         'organization_id' => $this->organization->id,
                     ], [
                         'color' => $this->colorService->getRandomColor(),
-                        'is_billable' => $record['Billability'] === 'Yes',
+                        'is_billable' => ($record['Billability'] ?? '') === 'Yes',
                         'billable_rate' => $billableRateKey !== null && $record[$billableRateKey] !== '' ? (int) (((float) $record[$billableRateKey]) * 100) : null,
                         'estimated_time' => isset($record['Estimated (h)']) && is_numeric($record['Estimated (h)']) ? (int) ($record['Estimated (h)'] * 3600) : null,
                         'archived_at' => $record['Status'] === 'Archived' ? Carbon::now() : null,
@@ -54,6 +54,7 @@ class ClockifyProjectsImporter extends DefaultImporter
                 if ($tasksKey !== null && $record[$tasksKey] !== '') {
                     $tasks = explode(', ', $record[$tasksKey]);
                     foreach ($tasks as $task) {
+                        $this->checkTaskNameLength($task);
                         $this->taskImportHelper->getKey([
                             'name' => $task,
                             'project_id' => $projectId,
@@ -83,7 +84,6 @@ class ClockifyProjectsImporter extends DefaultImporter
             'Project',
             'Status',
             'Visibility',
-            'Billability',
         ];
         foreach ($requiredFields as $requiredField) {
             if (! in_array($requiredField, $header, true)) {

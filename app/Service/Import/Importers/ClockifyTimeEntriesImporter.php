@@ -103,6 +103,7 @@ class ClockifyTimeEntriesImporter extends DefaultImporter
                 }
                 $taskId = null;
                 if (! $isBreak && $taskKey !== null && $record[$taskKey] !== '') {
+                    $this->checkTaskNameLength($record[$taskKey]);
                     $taskId = $this->taskImportHelper->getKey([
                         'name' => $record[$taskKey],
                         'project_id' => $projectId,
@@ -227,7 +228,6 @@ class ClockifyTimeEntriesImporter extends DefaultImporter
             'Project',
             'Description',
             'User',
-            'Group',
             'Email',
             'Tags',
             'Start Date',

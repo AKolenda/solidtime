@@ -10,7 +10,7 @@ import {
 } from '@tanstack/vue-table';
 import type { TimeEntry } from '@/packages/api/src';
 import TableRow from '@/Components/TableRow.vue';
-import Pagination from '@/Components/Common/Pagination.vue';
+import Pagination from '@/packages/ui/src/Pagination.vue';
 import DetailedReportTableHeading from '@/Components/Common/Reporting/DetailedReportTableHeading.vue';
 import { useTimeEntriesReportQuery } from '@/utils/useTimeEntriesReportQuery';
 import { useMembersQuery } from '@/utils/useMembersQuery';

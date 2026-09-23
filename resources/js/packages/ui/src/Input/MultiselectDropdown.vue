@@ -21,7 +21,7 @@ const NONE_ID = 'none';
 const ROW_HEIGHT = 32;
 
 const model = defineModel<string[]>({
-    default: [],
+    default: () => [],
 });
 
 const props = defineProps<{

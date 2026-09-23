@@ -7,7 +7,7 @@ import { type Client } from '@/packages/api/src';
 import ClientTableRow from '@/Components/Common/Client/ClientTableRow.vue';
 import ClientCreateModal from '@/Components/Common/Client/ClientCreateModal.vue';
 import ClientTableHeading from '@/Components/Common/Client/ClientTableHeading.vue';
-import Pagination from '@/Components/Common/Pagination.vue';
+import Pagination from '@/packages/ui/src/Pagination.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/packages/ui/src';
 import { useStorage } from '@vueuse/core';
 import { canCreateClients } from '@/utils/permissions';

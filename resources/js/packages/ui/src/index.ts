@@ -32,6 +32,7 @@ import InputLabel from './Input/InputLabel.vue';
 import TextInput from './Input/TextInput.vue';
 import LoadingSpinner from './LoadingSpinner.vue';
 import Modal from './Modal.vue';
+import Pagination from './Pagination.vue';
 import ProjectBadge from './Project/ProjectBadge.vue';
 import TimeEntryCreateModal from './TimeEntry/TimeEntryCreateModal.vue';
 import TimeEntryEditModal from './TimeEntry/TimeEntryEditModal.vue';
@@ -57,6 +58,16 @@ import {
     CalendarNextButton,
     CalendarPrevButton,
 } from './calendar/index';
+import {
+    Combobox,
+    ComboboxAnchor,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxSeparator,
+    ComboboxTrigger,
+    ComboboxViewport,
+} from './combobox/index';
 import { CommandPalette } from './CommandPalette/index';
 import {
     ContextMenu,
@@ -121,6 +132,7 @@ import FullCalendarDayHeader from './FullCalendar/FullCalendarDayHeader.vue';
 import FullCalendarEventContent from './FullCalendar/FullCalendarEventContent.vue';
 import TimeEntryCalendar from './FullCalendar/TimeEntryCalendar.vue';
 import DateRangePicker from './Input/DateRangePicker.vue';
+import DateRangeNavigator from './Input/DateRangeNavigator.vue';
 import { Label } from './label/index';
 import {
     NumberField,
@@ -176,6 +188,14 @@ export {
     CardTitle,
     Checkbox,
     color,
+    Combobox,
+    ComboboxAnchor,
+    ComboboxInput,
+    ComboboxItem,
+    ComboboxList,
+    ComboboxSeparator,
+    ComboboxTrigger,
+    ComboboxViewport,
     CommandPalette,
     ContextMenu,
     ContextMenuCheckboxItem,
@@ -192,6 +212,7 @@ export {
     ContextMenuSubTrigger,
     ContextMenuTrigger,
     DateRangePicker,
+    DateRangeNavigator,
     Dialog,
     DialogClose,
     DialogContent,
@@ -239,6 +260,7 @@ export {
     NumberFieldDecrement,
     NumberFieldIncrement,
     NumberFieldInput,
+    Pagination,
     Popover,
     PopoverAnchor,
     PopoverContent,

@@ -8,7 +8,7 @@ import {
     ArrowDownTrayIcon,
     LockClosedIcon,
 } from '@heroicons/vue/20/solid';
-import Pagination from '@/Components/Common/Pagination.vue';
+import Pagination from '@/packages/ui/src/Pagination.vue';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -65,7 +65,7 @@ type TimeEntryRoundingType = 'up' | 'down' | 'nearest';
 
 const startDate = useSessionStorage<string>(
     'reporting-start-date',
-    getLocalizedDayJs(getDayJsInstance()().format()).subtract(14, 'd').format()
+    getLocalizedDayJs(getDayJsInstance()().format()).subtract(13, 'd').format()
 );
 const endDate = useSessionStorage<string>(
     'reporting-end-date',
