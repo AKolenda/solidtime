@@ -14,7 +14,6 @@ use App\Models\ProjectMember;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Providers\Filament\AdminPanelProvider;
-use App\Providers\Filament\BackupPanelProvider;
 use Filament\Panel;
 use Illuminate\Support\Facades\Config;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -54,16 +53,15 @@ class UserModelTest extends ModelTestAbstract
         $this->assertTrue($canAccess);
     }
 
-    public function test_organization_admin_can_access_only_the_backup_panel(): void
+    public function test_organization_admin_can_manage_backups_but_not_access_admin_panel(): void
     {
         $organization = Organization::factory()->create();
         $user = User::factory()->create(['current_team_id' => $organization->getKey()]);
         $user->organizations()->attach($organization, ['role' => Role::Admin->value]);
         $adminPanel = (new AdminPanelProvider(app()))->panel(Panel::make());
-        $backupPanel = (new BackupPanelProvider(app()))->panel(Panel::make());
 
         $this->assertFalse($user->canAccessPanel($adminPanel));
-        $this->assertTrue($user->canAccessPanel($backupPanel));
+        $this->assertTrue($user->canManageDatabaseBackups());
     }
 
     public function test_placeholder_user_with_a_super_admin_email_can_not_access_admin_panel(): void

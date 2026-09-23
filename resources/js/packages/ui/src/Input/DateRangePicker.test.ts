@@ -28,9 +28,9 @@ describe('DateRangePicker', () => {
                 },
             },
         });
-        expect(wrapper.get('button').text()).toContain('Today');
+        expect(wrapper.get('[data-testid="date_range_picker_display"]').text()).toContain('Today');
 
-        await wrapper.get('button').trigger('click');
+        await wrapper.get('[data-testid="date_range_picker_display"]').trigger('click');
         await nextTick();
 
         const lastMonth = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -40,9 +40,11 @@ describe('DateRangePicker', () => {
         lastMonth?.click();
         await nextTick();
 
-        expect(wrapper.get('button').text()).toContain('Last Month');
+        expect(wrapper.get('[data-testid="date_range_picker_display"]').text()).toContain(
+            'Last Month'
+        );
 
-        await wrapper.get('button').trigger('click');
+        await wrapper.get('[data-testid="date_range_picker_display"]').trigger('click');
         await nextTick();
 
         const selectedLastMonth = [

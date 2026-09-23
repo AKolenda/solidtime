@@ -153,10 +153,6 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
 
     public function canAccessPanel(Panel $panel): bool
     {
-        if ($panel->getId() === 'backups') {
-            return $this->canManageDatabaseBackups();
-        }
-
         return $this->is_placeholder === false
             && in_array($this->email, config('auth.super_admins', []), true)
             && $this->hasVerifiedEmail();
