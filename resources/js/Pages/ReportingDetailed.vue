@@ -36,6 +36,8 @@ import { useTagsQuery } from '@/utils/useTagsQuery';
 import { useTagsStore } from '@/utils/useTags';
 import { useSessionStorage, useStorage } from '@vueuse/core';
 import DetailedReportTable from '@/Components/Common/Reporting/DetailedReportTable.vue';
+import DetailedReportSelectionActions from '@/Components/Common/Reporting/DetailedReportSelectionActions.vue';
+import DetailedReportViewControls from '@/Components/Common/Reporting/DetailedReportViewControls.vue';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { useProjectsStore } from '@/utils/useProjects';
@@ -49,7 +51,6 @@ import ReportingTabNavbar from '@/Components/Common/Reporting/ReportingTabNavbar
 import UpgradeModal from '@/Components/Common/UpgradeModal.vue';
 import type { ExportFormat } from '@/types/reporting';
 import { useNotificationsStore } from '@/utils/notification';
-import TimeEntryMassActionRow from '@/packages/ui/src/TimeEntry/TimeEntryMassActionRow.vue';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import { canCreateProjects, canViewAllTimeEntries } from '@/utils/permissions';
 import ReportingExportModal from '@/Components/Common/Reporting/ReportingExportModal.vue';
@@ -370,33 +371,34 @@ async function downloadExport(format: ExportFormat) {
             v-model:rounding-minutes="roundingMinutes"
             v-model:start-date="startDate"
             v-model:end-date="endDate"
-            @submit="updateFilteredTimeEntries" />
-        <TimeEntryMassActionRow
-            :selected-time-entries="selectedTimeEntries"
-            :can-create-project="canCreateProjects()"
-            :enable-estimated-time="isAllowedToPerformPremiumAction()"
-            :delete-selected="deleteSelected"
-            :all-selected="selectedTimeEntries.length === timeEntries.length"
-            :projects="projects"
-            :tasks="tasks"
-            :tags="tags"
-            :currency="getOrganizationCurrencyString()"
-            :clients="clients"
-            :organization-billable-rate="organization?.billable_rate ?? null"
-            class="border-b border-default-background-separator"
-            :update-time-entries="
-                (args) =>
-                    updateTimeEntries(
-                        selectedTimeEntries.map((timeEntry) => timeEntry.id),
-                        args
-                    )
-            "
-            :create-project="createProject"
-            :create-client="createClient"
-            :create-tag="createTag"
-            @submit="clearSelectionAndState"
-            @select-all="selectedTimeEntries = [...timeEntries]"
-            @unselect-all="selectedTimeEntries = []"></TimeEntryMassActionRow>
+            @submit="updateFilteredTimeEntries">
+            <template #actions>
+                <DetailedReportSelectionActions
+                    :selected-time-entries="selectedTimeEntries"
+                    :can-create-project="canCreateProjects()"
+                    :enable-estimated-time="isAllowedToPerformPremiumAction()"
+                    :delete-selected="deleteSelected"
+                    :projects="projects"
+                    :tasks="tasks"
+                    :tags="tags"
+                    :currency="getOrganizationCurrencyString()"
+                    :clients="clients"
+                    :organization-billable-rate="organization?.billable_rate ?? null"
+                    :update-time-entries="
+                        (args) =>
+                            updateTimeEntries(
+                                selectedTimeEntries.map((timeEntry) => timeEntry.id),
+                                args
+                            )
+                    "
+                    :create-project="createProject"
+                    :create-client="createClient"
+                    :create-tag="createTag"
+                    @submit="clearSelectionAndState"
+                    @clear="selectedTimeEntries = []" />
+                <DetailedReportViewControls />
+            </template>
+        </ReportingFilterBar>
         <DetailedReportTable
             v-model:selected-time-entries="selectedTimeEntries"
             :time-entries="timeEntries"

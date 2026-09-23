@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { debounceFilter, useStorage } from '@vueuse/core';
 import {
     getCoreRowModel,
     useVueTable,
@@ -40,6 +39,7 @@ import { collapseTimeEntries, type CollapsedTimeEntry } from '@/utils/collapseTi
 import DetailedReportTableHeading from '@/Components/Common/Reporting/DetailedReportTableHeading.vue';
 import DetailedReportTableRow from '@/Components/Common/Reporting/DetailedReportTableRow.vue';
 import type { ReportEntryChanges, ReportEntryEditorContext } from './reportEntryEditing';
+import { useDetailedReportTableState } from './useDetailedReportTableState';
 
 export type DetailedReportRow = CollapsedTimeEntry;
 
@@ -99,26 +99,7 @@ const clientMap = computed(() => new Map(clients.value.map((client) => [client.i
 const tagMap = computed(() => new Map(tags.value.map((tag) => [tag.id, tag])));
 const memberMap = computed(() => new Map(members.value.map((member) => [member.user_id, member])));
 
-/**
- * Column widths and the grouping toggle survive a reload. Widths are keyed by
- * column id, so adding or removing a column later just falls back to its default size.
- */
-interface DetailedReportTableState {
-    columnSizing: ColumnSizingState;
-    collapseDuplicates: boolean;
-}
-
-const tableState = useStorage<DetailedReportTableState>(
-    'detailed-report-table-state',
-    {
-        columnSizing: {},
-        collapseDuplicates: true,
-    },
-    undefined,
-    // `columnResizeMode: 'onChange'` fires on every mouse move, so persistence is debounced
-    // while the in-memory value stays immediate.
-    { mergeDefaults: true, eventFilter: debounceFilter(250) }
-);
+const tableState = useDetailedReportTableState();
 
 const rows = computed<DetailedReportRow[]>(() => {
     if (tableState.value.collapseDuplicates) {
@@ -177,11 +158,16 @@ const gridTemplate = computed(
             .join(' ')} minmax(0, 1fr);`
 );
 
-function resetColumnWidths() {
-    tableState.value.columnSizing = {};
-}
-
 const selectedIds = computed(() => new Set(props.selectedTimeEntries.map((entry) => entry.id)));
+const allSelected = computed(
+    () =>
+        props.timeEntries.length > 0 &&
+        props.timeEntries.every((entry) => selectedIds.value.has(entry.id))
+);
+
+function setAllSelected(selected: boolean) {
+    emit('update:selectedTimeEntries', selected ? [...props.timeEntries] : []);
+}
 
 function isRowSelected(row: DetailedReportRow): boolean {
     return row.collapsed_ids.every((id) => selectedIds.value.has(id));
@@ -290,29 +276,23 @@ async function createTag(name: string) {
 <template>
     <div class="w-full">
         <p v-if="editError" role="alert" class="px-4 py-2 text-sm text-red-600">{{ editError }}</p>
-        <div
-            class="flex items-center justify-end gap-4 px-4 sm:px-6 lg:px-8 py-2 border-b border-default-background-separator">
-            <label
-                class="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary transition-colors cursor-pointer select-none">
-                <Checkbox
-                    :checked="tableState.collapseDuplicates"
-                    @update:checked="tableState.collapseDuplicates = $event === true" />
-                Group identical entries
-            </label>
-            <button
-                type="button"
-                class="text-xs text-text-secondary hover:text-text-primary transition-colors"
-                @click="resetColumnWidths">
-                Reset column widths
-            </button>
-        </div>
         <div class="flow-root max-w-[100vw] overflow-x-auto">
             <div class="inline-block min-w-full align-middle">
                 <div
                     data-testid="detailed_report_table"
                     class="grid min-w-full"
                     :style="gridTemplate">
-                    <DetailedReportTableHeading :headers="headers"></DetailedReportTableHeading>
+                    <DetailedReportTableHeading :headers="headers">
+                        <template #select>
+                            <Checkbox
+                                id="selectAll"
+                                aria-label="Select All"
+                                data-testid="detailed_report_select_all"
+                                :checked="allSelected"
+                                :indeterminate="selectedTimeEntries.length > 0 && !allSelected"
+                                @update:checked="setAllSelected($event === true)" />
+                        </template>
+                    </DetailedReportTableHeading>
                     <template v-for="row in rows" :key="row.id">
                         <DetailedReportTableRow
                             :entry="row"

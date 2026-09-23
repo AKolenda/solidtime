@@ -60,9 +60,8 @@ async function createTag(name: string) {
 
 <template>
     <div class="py-2.5 w-full border-b border-default-background-separator">
-        <MainContainer class="sm:flex space-y-4 sm:space-y-0 justify-between">
-            <div class="flex flex-wrap items-center space-y-2 sm:space-y-0 space-x-3">
-                <div class="text-sm font-medium">Filters</div>
+        <MainContainer class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <MemberMultiselectDropdown v-model="selectedMembers" @submit="emit('submit')">
                     <template #trigger>
                         <ReportingFilterBadge
@@ -207,7 +206,8 @@ async function createTag(name: string) {
                     v-model:minutes="roundingMinutes"
                     @change="emit('submit')" />
             </div>
-            <div>
+            <div class="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+                <slot name="actions"></slot>
                 <DateRangePicker
                     v-model:start="startDate"
                     v-model:end="endDate"

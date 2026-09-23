@@ -27,7 +27,8 @@ function alignsRight(header: Header<Row, unknown>): boolean {
                 index === 0 ? 'pl-4 sm:pl-6 lg:pl-8' : '',
                 alignsRight(header) ? 'justify-end' : '',
             ]">
-            <span class="truncate">{{ label(header) }}</span>
+            <slot v-if="$slots[header.id]" :name="header.id"></slot>
+            <span v-else class="truncate">{{ label(header) }}</span>
             <!--
                 Column resize grip. TanStack owns the drag maths (columnResizeMode: 'onChange'),
                 we only forward the pointer events and paint the handle.
