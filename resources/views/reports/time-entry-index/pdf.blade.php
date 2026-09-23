@@ -174,6 +174,7 @@
 @if($shopReport)
 @php($quarterHours = fn (int|float $seconds): string => number_format(round(($seconds / 3600) * 4) / 4, 2).' h')
 @php($quarterValue = fn (int|float $hours): string => number_format(round($hours * 4) / 4, 2).' h')
+@php($pieceHours = fn (int|float $seconds): string => number_format($seconds / 3600, 2).' h')
 <div class="shop-header">
     <div>
         <div class="company-name">{{ $shopReportOrganizationName }}</div>
@@ -211,7 +212,7 @@
             <tr>
                 <td class="task-name">{{ $task['name'] }}</td>
                 <td class="task-total">{{ $quarterHours($task['seconds']) }}</td>
-                <td class="task-total">{{ $task['seconds_per_piece'] !== null ? $quarterHours($task['seconds_per_piece']) : '-' }}</td>
+                <td class="task-total">{{ $task['seconds_per_piece'] !== null ? $pieceHours($task['seconds_per_piece']) : '-' }}</td>
             </tr>
         @endforeach
         </tbody>

@@ -23,15 +23,17 @@
         </style>
     </head>
     <body>
-    @if($shopReport && $shopReport->runningSeconds !== null && $shopReport->totalQuantity !== null)
+    @if($shopReport && $shopReport->secondsPerPiece !== null)
         @php($quarterHours = fn (int|float $seconds): string => number_format(round(($seconds / 3600) * 4) / 4, 2).' h')
+        @php($pieceHours = fn (int|float $seconds): string => number_format($seconds / 3600, 2).' h')
         @php($turningOperation = collect($shopReport->operations)->firstWhere('name', 'Turning'))
         @php($millingOperation = collect($shopReport->operations)->firstWhere('name', 'Milling'))
+        @php($setupLabel = $shopReport->runningSeconds !== null ? 'Setup' : 'Total')
         <div class="shop-footer">
-            <div><span>Total Running</span><strong>{{ $quarterHours($shopReport->runningSeconds) }}</strong></div>
-            <div><span>Turning Setup</span><strong>{{ $quarterHours($turningOperation['setup_seconds'] ?? 0) }}</strong></div>
-            <div><span>Milling Setup</span><strong>{{ $quarterHours($millingOperation['setup_seconds'] ?? 0) }}</strong></div>
-            <div><span>Combined Run Avg / Piece</span><strong>{{ $quarterHours($shopReport->runningSeconds / $shopReport->totalQuantity) }}</strong></div>
+            <div><span>Total Running</span><strong>{{ $shopReport->runningSeconds !== null ? $quarterHours($shopReport->runningSeconds) : '-' }}</strong></div>
+            <div><span>Turning {{ $setupLabel }}</span><strong>{{ $quarterHours($turningOperation['setup_seconds'] ?? 0) }}</strong></div>
+            <div><span>Milling {{ $setupLabel }}</span><strong>{{ $quarterHours($millingOperation['setup_seconds'] ?? 0) }}</strong></div>
+            <div><span>{{ $shopReport->runningSeconds !== null ? 'Combined Run Avg / Piece' : 'Combined Avg / Piece' }}</span><strong>{{ $pieceHours($shopReport->secondsPerPiece) }}</strong></div>
         </div>
     @endif
     <div class="page-number">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>

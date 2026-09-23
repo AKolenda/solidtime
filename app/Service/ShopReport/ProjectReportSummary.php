@@ -22,6 +22,7 @@ final readonly class ProjectReportSummary
         public array $operations,
         public ?int $runningSeconds,
         public ?float $totalQuantity,
+        public ?float $secondsPerPiece,
     ) {}
 
     /** @param Collection<int, TimeEntry> $timeEntries */
@@ -44,17 +45,37 @@ final readonly class ProjectReportSummary
             ];
         }
 
-        $totalQuantity = array_sum(array_filter(array_column($parts, 'quantity'), fn ($value): bool => $value !== null));
+        $partQuantities = array_filter(array_column($parts, 'quantity'), fn ($value): bool => $value !== null && $value > 0);
+        $totalQuantity = (float) array_sum($partQuantities);
+        // The first piece of every part is covered by programming, setup and F/O, so running time only covers the rest.
+        $runningQuantity = $totalQuantity - count($partQuantities);
+        $runningPerPiece = fn (int $seconds): ?float => $seconds > 0 && $runningQuantity > 0 ? $seconds / $runningQuantity : null;
+        // Without running entries the first-off cannot be separated, so the whole time is spread over every piece.
+        $totalPerPiece = fn (int $seconds): ?float => $seconds > 0 && $totalQuantity > 0 ? $seconds / $totalQuantity : null;
+
+        $durationOf = fn (Collection $entries): int => (int) $entries->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds);
+        $isRunning = fn (?string $taskName): bool => str_contains(strtolower($taskName ?? ''), 'running');
+        $operationOf = fn (?string $taskName): string => strtolower(trim(explode(' - ', $taskName ?? '', 2)[0]));
+        $operationsWithRunning = $timeEntries
+            ->filter(fn (TimeEntry $entry): bool => $isRunning($entry->task?->name))
+            ->map(fn (TimeEntry $entry): string => $operationOf($entry->task?->name))
+            ->unique()
+            ->all();
+
         $taskTotals = $timeEntries
             ->groupBy(fn (TimeEntry $entry): string => $entry->task?->name ?? 'No task')
-            ->map(function (Collection $entries, string $name) use ($totalQuantity): array {
-                $seconds = (int) $entries->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds);
-                $isRunning = str_contains(strtolower($name), 'running');
+            ->map(function (Collection $entries, string $name) use ($durationOf, $isRunning, $operationOf, $operationsWithRunning, $runningPerPiece, $totalPerPiece): array {
+                $seconds = $durationOf($entries);
+                $taskName = $entries->first()?->task?->name;
 
                 return [
                     'name' => $name,
                     'seconds' => $seconds,
-                    'seconds_per_piece' => $isRunning && $totalQuantity > 0 ? $seconds / $totalQuantity : null,
+                    'seconds_per_piece' => match (true) {
+                        $isRunning($taskName) => $runningPerPiece($seconds),
+                        ! in_array($operationOf($taskName), $operationsWithRunning, true) => $totalPerPiece($seconds),
+                        default => null,
+                    },
                 ];
             })
             ->sortBy(function (array $task): string {
@@ -67,25 +88,24 @@ final readonly class ProjectReportSummary
             ->values()
             ->all();
 
-        $runningSeconds = (int) $timeEntries
-            ->filter(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task?->name ?? ''), 'running'))
-            ->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds);
-        $operations = collect(['Turning', 'Milling'])->map(function (string $operation) use ($timeEntries, $totalQuantity): array {
+        $runningSeconds = $durationOf($timeEntries->filter(fn (TimeEntry $entry): bool => $isRunning($entry->task?->name)));
+        $operations = collect(['Turning', 'Milling'])->map(function (string $operation) use ($timeEntries, $durationOf, $isRunning, $runningPerPiece, $totalPerPiece): array {
             $matching = $timeEntries->filter(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task?->name ?? ''), strtolower($operation)));
-            $running = (int) $matching
-                ->filter(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task?->name ?? ''), 'running'))
-                ->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds);
-            $setup = (int) $matching
-                ->reject(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task?->name ?? ''), 'running'))
-                ->sum(fn (TimeEntry $entry): int => (int) $entry->getDuration()->totalSeconds);
+            $running = $durationOf($matching->filter(fn (TimeEntry $entry): bool => $isRunning($entry->task?->name)));
+            $setup = $durationOf($matching->reject(fn (TimeEntry $entry): bool => $isRunning($entry->task?->name)));
 
             return [
                 'name' => $operation,
                 'setup_seconds' => $setup,
                 'running_seconds' => $running,
-                'seconds_per_piece' => $running > 0 && $totalQuantity > 0 ? $running / $totalQuantity : null,
+                'seconds_per_piece' => $running > 0 ? $runningPerPiece($running) : $totalPerPiece($setup),
             ];
         })->filter(fn (array $operation): bool => $operation['setup_seconds'] > 0 || $operation['running_seconds'] > 0)->values()->all();
+
+        $operationAverages = array_filter(array_column($operations, 'seconds_per_piece'), fn (?float $value): bool => $value !== null);
+        $secondsPerPiece = $operationAverages !== []
+            ? (float) array_sum($operationAverages)
+            : $totalPerPiece($durationOf($timeEntries));
 
         return new self(
             projectName: $projectName,
@@ -95,6 +115,7 @@ final readonly class ProjectReportSummary
             operations: $operations,
             runningSeconds: $runningSeconds > 0 ? $runningSeconds : null,
             totalQuantity: $totalQuantity > 0 ? $totalQuantity : null,
+            secondsPerPiece: $secondsPerPiece,
         );
     }
 
