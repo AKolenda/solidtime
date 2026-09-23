@@ -1,15 +1,18 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="Row">
 import TableHeading from '@/Components/Common/TableHeading.vue';
 import type { Header } from '@tanstack/vue-table';
-import type { DetailedReportRow } from '@/Components/Common/Reporting/DetailedReportTable.vue';
 
 defineProps<{
-    headers: Header<DetailedReportRow, unknown>[];
+    headers: Header<Row, unknown>[];
 }>();
 
-function label(header: Header<DetailedReportRow, unknown>): string {
+function label(header: Header<Row, unknown>): string {
     const header_ = header.column.columnDef.header;
     return typeof header_ === 'string' ? header_ : '';
+}
+
+function alignsRight(header: Header<Row, unknown>): boolean {
+    return (header.column.columnDef.meta as { align?: 'right' } | undefined)?.align === 'right';
 }
 </script>
 
@@ -20,7 +23,10 @@ function label(header: Header<DetailedReportRow, unknown>): string {
             :key="header.id"
             :data-column="header.id"
             class="relative min-w-0 overflow-hidden py-1.5 px-3 text-left text-text-tertiary select-none flex items-center"
-            :class="index === 0 ? 'pl-4 sm:pl-6 lg:pl-8' : ''">
+            :class="[
+                index === 0 ? 'pl-4 sm:pl-6 lg:pl-8' : '',
+                alignsRight(header) ? 'justify-end' : '',
+            ]">
             <span class="truncate">{{ label(header) }}</span>
             <!--
                 Column resize grip. TanStack owns the drag maths (columnResizeMode: 'onChange'),

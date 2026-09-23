@@ -10,6 +10,8 @@ import {
     CheckCircleIcon,
     UserGroupIcon,
     PencilSquareIcon,
+    ClockIcon,
+    ChartBarIcon,
 } from '@heroicons/vue/20/solid';
 
 import { Link } from '@inertiajs/vue3';
@@ -24,6 +26,8 @@ import { canCreateProjects, canCreateTasks, canViewProjectMembers } from '@/util
 import { TabBar, TabBarItem } from '@/packages/ui/src';
 import { useTasksQuery } from '@/utils/useTasksQuery';
 import ProjectEditModal from '@/Components/Common/Project/ProjectEditModal.vue';
+import ProjectTimeEntriesTable from '@/Components/Common/Project/ProjectTimeEntriesTable.vue';
+import ProjectMemberTimeTable from '@/Components/Common/Project/ProjectMemberTimeTable.vue';
 import { Badge } from '@/packages/ui/src';
 import { formatCents } from '../packages/ui/src/utils/money';
 import { getOrganizationCurrencyString } from '../utils/money';
@@ -135,50 +139,84 @@ const shownTasks = computed(() => {
             </div>
         </MainContainer>
         <MainContainer>
-            <div class="grid lg:grid-cols-2 gap-x-6 pt-6">
-                <div>
-                    <CardTitle title="Tasks" :icon="CheckCircleIcon">
-                        <template #actions>
-                            <div class="w-full items-center flex justify-between">
-                                <div class="pl-6">
-                                    <TabBar v-model="activeTab">
-                                        <TabBarItem value="active">Active </TabBarItem>
-                                        <TabBarItem value="done">Done </TabBarItem>
-                                    </TabBar>
+            <div class="grid lg:grid-cols-2 gap-6 pt-6 pb-6">
+                <div class="min-w-0 space-y-6">
+                    <div>
+                        <CardTitle title="Tasks" :icon="CheckCircleIcon">
+                            <template #actions>
+                                <div class="w-full items-center flex justify-between">
+                                    <div class="pl-6">
+                                        <TabBar v-model="activeTab">
+                                            <TabBarItem value="active">Active </TabBarItem>
+                                            <TabBarItem value="done">Done </TabBarItem>
+                                        </TabBar>
+                                    </div>
+                                    <SecondaryButton
+                                        v-if="canCreateTasks()"
+                                        :icon="PlusIcon"
+                                        @click="createTask = true"
+                                        >Create Task
+                                    </SecondaryButton>
+                                    <TaskCreateModal
+                                        v-model:show="createTask"
+                                        :project-id="projectId"></TaskCreateModal>
                                 </div>
-                                <SecondaryButton
-                                    v-if="canCreateTasks()"
-                                    :icon="PlusIcon"
-                                    @click="createTask = true"
-                                    >Create Task
-                                </SecondaryButton>
-                                <TaskCreateModal
-                                    v-model:show="createTask"
-                                    :project-id="projectId"></TaskCreateModal>
-                            </div>
-                        </template>
-                    </CardTitle>
-                    <Card>
-                        <TaskTable :tasks="shownTasks" :project-id="projectId"></TaskTable>
-                    </Card>
+                            </template>
+                        </CardTitle>
+                        <Card>
+                            <TaskTable :tasks="shownTasks" :project-id="projectId"></TaskTable>
+                        </Card>
+                    </div>
+                    <div>
+                        <CardTitle title="Time Entries" :icon="ClockIcon">
+                            <template #actions>
+                                <Link
+                                    :href="
+                                        route('reporting.detailed', {
+                                            project: projectId,
+                                            range: 'all',
+                                        })
+                                    ">
+                                    <SecondaryButton :icon="ChartBarIcon">
+                                        Detailed Report
+                                    </SecondaryButton>
+                                </Link>
+                            </template>
+                        </CardTitle>
+                        <Card>
+                            <ProjectTimeEntriesTable
+                                :project-id="projectId"></ProjectTimeEntriesTable>
+                        </Card>
+                    </div>
                 </div>
-                <div v-if="canViewProjectMembers()">
-                    <CardTitle title="Project Members" :icon="UserGroupIcon">
-                        <template #actions>
-                            <SecondaryButton :icon="PlusIcon" @click="createProjectMember = true">
-                                Add Member
-                            </SecondaryButton>
-                            <ProjectMemberCreateModal
-                                v-model:show="createProjectMember"
-                                :project-id="projectId"
-                                :existing-members="projectMembers"></ProjectMemberCreateModal>
-                        </template>
-                    </CardTitle>
-                    <Card>
-                        <ProjectMemberTable
-                            :project-members="projectMembers"
-                            :project-id="projectId"></ProjectMemberTable>
-                    </Card>
+                <div class="min-w-0 space-y-6">
+                    <div>
+                        <CardTitle title="Time by Member" :icon="UserGroupIcon"></CardTitle>
+                        <Card>
+                            <ProjectMemberTimeTable
+                                :project-id="projectId"></ProjectMemberTimeTable>
+                        </Card>
+                    </div>
+                    <div v-if="canViewProjectMembers()">
+                        <CardTitle title="Project Members" :icon="UserGroupIcon">
+                            <template #actions>
+                                <SecondaryButton
+                                    :icon="PlusIcon"
+                                    @click="createProjectMember = true">
+                                    Add Member
+                                </SecondaryButton>
+                                <ProjectMemberCreateModal
+                                    v-model:show="createProjectMember"
+                                    :project-id="projectId"
+                                    :existing-members="projectMembers"></ProjectMemberCreateModal>
+                            </template>
+                        </CardTitle>
+                        <Card>
+                            <ProjectMemberTable
+                                :project-members="projectMembers"
+                                :project-id="projectId"></ProjectMemberTable>
+                        </Card>
+                    </div>
                 </div>
             </div>
         </MainContainer>
