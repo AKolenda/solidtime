@@ -31,7 +31,11 @@ final readonly class ProjectReportSummary
         $segments = array_values(array_filter(array_map('trim', explode(' - ', $projectName))));
         $partNames = isset($segments[0]) ? array_map('trim', explode('+', $segments[0])) : [];
         $purchaseOrder = $segments[1] ?? null;
-        $quantities = self::numberList(self::segmentValue($segments, '/(?:pcs?|pieces?|halves)\b/i'));
+        $quantities = self::numberList(self::segmentValue($segments, '/\d.*(?:pcs?|pieces?|halves)\b(?!\/)/i'));
+        // One part ordered on several purchase orders lists a quantity per order, e.g. "28 + 6 Pcs".
+        if (count($partNames) === 1 && count($quantities) > 1) {
+            $quantities = [(float) array_sum($quantities)];
+        }
         $turning = self::numberList(self::prefixedValue($segments, 'QT'));
         $milling = self::numberList(self::prefixedValue($segments, 'QM'));
 

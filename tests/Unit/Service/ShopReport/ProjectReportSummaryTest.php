@@ -74,4 +74,20 @@ class ProjectReportSummaryTest extends TestCase
         $this->assertSame(1800.0, $summary->operations[0]['seconds_per_piece']);
         $this->assertSame(1800.0, $summary->secondsPerPiece);
     }
+
+    public function test_it_adds_every_quantity_when_one_part_spans_several_purchase_orders(): void
+    {
+        $summary = ProjectReportSummary::from('640164 - 41847 - 41916 - 28 + 6 Pcs - QT 9 QM 4', collect());
+
+        $this->assertSame([34.0], array_column($summary->parts, 'quantity'));
+        $this->assertSame(34.0, $summary->totalQuantity);
+    }
+
+    public function test_it_does_not_read_a_pc_purchase_order_as_the_quantity(): void
+    {
+        $summary = ProjectReportSummary::from('Front Fork - PC/PO/205/19 - 1 Pcs - QT 1.5 QM 3', collect());
+
+        $this->assertSame('PC/PO/205/19', $summary->purchaseOrder);
+        $this->assertSame(1.0, $summary->totalQuantity);
+    }
 }
