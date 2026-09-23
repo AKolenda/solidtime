@@ -38,11 +38,16 @@ function alignsRight(header: Header<Row, unknown>): boolean {
                 role="separator"
                 aria-orientation="vertical"
                 :aria-label="`Resize ${label(header)} column`"
-                class="absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none transition-colors hover:bg-accent-300/50"
-                :class="header.column.getIsResizing() ? 'bg-accent-300/70' : ''"
+                class="group/resize absolute inset-y-0 right-0 z-10 w-3 cursor-col-resize touch-none select-none"
                 @mousedown="header.getResizeHandler()($event)"
                 @touchstart="header.getResizeHandler()($event)"
-                @dblclick="header.column.resetSize()"></div>
+                @dblclick="header.column.resetSize()">
+                <span
+                    class="absolute inset-y-1 right-0 w-px transition-colors duration-200 group-hover/resize:bg-accent-400"
+                    :class="
+                        header.column.getIsResizing() ? 'bg-accent-400' : 'bg-transparent'
+                    "></span>
+            </div>
         </div>
         <!-- Filler cell so the heading background spans any leftover width. -->
         <div></div>

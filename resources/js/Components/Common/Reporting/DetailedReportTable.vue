@@ -122,7 +122,6 @@ const columns: ColumnDef<DetailedReportRow>[] = [
     { id: 'task', header: 'Task', size: 180, minSize: 80 },
     { id: 'client', header: 'Client', size: 180, minSize: 80 },
     { id: 'tags', header: 'Tags', size: 160, minSize: 80 },
-    { id: 'billable', header: 'Billable', size: 90, minSize: 70 },
     { id: 'time', header: 'Time', size: 150, minSize: 100 },
     { id: 'duration', header: 'Duration', size: 120, minSize: 90 },
     { id: 'actions', header: '', size: 56, minSize: 56, enableResizing: false },

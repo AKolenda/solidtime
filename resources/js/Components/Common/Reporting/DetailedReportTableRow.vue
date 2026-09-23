@@ -10,7 +10,6 @@ import {
     ContextMenuTrigger,
 } from '@/packages/ui/src';
 import TimeEntryMoreOptionsDropdown from '@/packages/ui/src/TimeEntry/TimeEntryMoreOptionsDropdown.vue';
-import BillableIcon from '@/packages/ui/src/Icons/BillableIcon.vue';
 import TagBadge from '@/packages/ui/src/Tag/TagBadge.vue';
 import BreakLabel from '@/packages/ui/src/TimeEntry/BreakLabel.vue';
 import { PlayIcon, PencilIcon, DocumentDuplicateIcon, TrashIcon } from '@heroicons/vue/20/solid';
@@ -220,19 +219,6 @@ function onSelectChange(checked: boolean | unknown[]) {
                             +{{ entryTags.length - 1 }}
                         </span>
                         <span v-if="entryTags.length === 0" class="text-text-tertiary">--</span>
-                    </DetailedReportEditableCell>
-                </div>
-                <div class="flex items-center min-w-0 overflow-hidden px-3 py-0">
-                    <DetailedReportEditableCell
-                        field="billable"
-                        :entries="originalEntries"
-                        :context="editorContext"
-                        ><BillableIcon
-                            :aria-label="entry.billable ? 'Billable' : 'Non billable'"
-                            class="w-5 h-5"
-                            :class="
-                                entry.billable ? 'text-input-select-active' : 'text-icon-default/40'
-                            "></BillableIcon>
                     </DetailedReportEditableCell>
                 </div>
                 <div
