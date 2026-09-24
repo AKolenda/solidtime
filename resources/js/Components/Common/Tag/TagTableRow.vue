@@ -3,6 +3,7 @@ import type { Tag } from '@/packages/api/src';
 import { useTagsStore } from '@/utils/useTags';
 import TagMoreOptionsDropdown from '@/Components/Common/Tag/TagMoreOptionsDropdown.vue';
 import TagEditModal from '@/Components/Common/Tag/TagEditModal.vue';
+import TagDeleteModal from '@/Components/Common/Tag/TagDeleteModal.vue';
 import TableRow from '@/Components/TableRow.vue';
 import { canDeleteTags, canUpdateTags } from '@/utils/permissions';
 import { ref } from 'vue';
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>();
 
 const showTagEditModal = ref(false);
+const showTagDeleteModal = ref(false);
 
 function deleteTag() {
     useTagsStore().deleteTag(props.tag.id);
@@ -42,9 +44,13 @@ function deleteTag() {
                         v-if="canDeleteTags() || canUpdateTags()"
                         :tag="tag"
                         @edit="showTagEditModal = true"
-                        @delete="deleteTag"></TagMoreOptionsDropdown>
+                        @delete="showTagDeleteModal = true"></TagMoreOptionsDropdown>
                 </div>
                 <TagEditModal v-model:show="showTagEditModal" :tag="tag"></TagEditModal>
+                <TagDeleteModal
+                    v-model:show="showTagDeleteModal"
+                    :tag="tag"
+                    @confirm="deleteTag"></TagDeleteModal>
             </TableRow>
         </ContextMenuTrigger>
         <ContextMenuContent class="min-w-[160px]">
@@ -59,7 +65,7 @@ function deleteTag() {
             <ContextMenuItem
                 v-if="canDeleteTags()"
                 class="space-x-3 text-destructive"
-                @select="deleteTag()">
+                @select="showTagDeleteModal = true">
                 <TrashIcon class="w-4 h-4 text-icon-default" />
                 <span>Delete</span>
             </ContextMenuItem>
