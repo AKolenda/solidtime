@@ -205,6 +205,7 @@ async function downloadExport(format: ExportFormat) {
         if (response?.download_url) {
             showExportModal.value = true;
             exportUrl.value = response.download_url as string;
+            previewUrl.value = response.preview_url as string | null;
         }
     }
 }
@@ -212,6 +213,7 @@ async function downloadExport(format: ExportFormat) {
 const { projects } = useProjectsQuery();
 const showExportModal = ref(false);
 const exportUrl = ref<string | null>(null);
+const previewUrl = ref<string | null>(null);
 const showCreateReportModal = ref(false);
 const showPremiumModal = ref(false);
 const exportLoading = ref(false);
@@ -295,7 +297,8 @@ const tableData = computed(() => {
 <template>
     <ReportingExportModal
         v-model:show="showExportModal"
-        :export-url="exportUrl"></ReportingExportModal>
+        :export-url="exportUrl"
+        :preview-url="previewUrl"></ReportingExportModal>
     <ReportCreateModal
         v-model:show="showCreateReportModal"
         :properties="reportProperties"></ReportCreateModal>

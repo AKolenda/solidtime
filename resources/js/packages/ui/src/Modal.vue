@@ -15,6 +15,10 @@ const props = defineProps({
         type: Boolean,
         default: true,
     },
+    overlayClass: {
+        type: String,
+        default: null,
+    },
 });
 
 const emit = defineEmits(['close', 'submit']);
@@ -57,7 +61,7 @@ const maxWidthClass = computed(() => {
 
 <template>
     <Dialog :open="show" @update:open="close">
-        <DialogContent :class="maxWidthClass">
+        <DialogContent :class="maxWidthClass" :overlay-class="overlayClass">
             <div class="min-w-0" @keydown.capture="onKeydownCapture">
                 <slot />
             </div>

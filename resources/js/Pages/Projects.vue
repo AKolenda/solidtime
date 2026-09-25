@@ -220,6 +220,7 @@ const showExportReadyModal = ref(false);
 const showPremiumModal = ref(false);
 const exportLoading = ref(false);
 const exportUrl = ref<string | null>(null);
+const previewUrl = ref<string | null>(null);
 const exportStartDate = ref(getLocalizedDayJs('1970-01-01').startOf('day').format());
 const exportEndDate = ref(getLocalizedDayJs(getDayJsInstance()().format()).format());
 const { handleApiRequestNotifications } = useNotificationsStore();
@@ -266,6 +267,7 @@ async function exportDetailedPdf() {
 
     if (response?.download_url) {
         exportUrl.value = response.download_url as string;
+        previewUrl.value = response.preview_url as string | null;
         showProjectExportModal.value = false;
         showExportReadyModal.value = true;
     }
@@ -281,7 +283,10 @@ async function exportDetailedPdf() {
             :project="selectedExportProject"
             :loading="exportLoading"
             @export="exportDetailedPdf" />
-        <ReportingExportModal v-model:show="showExportReadyModal" :export-url="exportUrl" />
+        <ReportingExportModal
+            v-model:show="showExportReadyModal"
+            :export-url="exportUrl"
+            :preview-url="previewUrl" />
         <UpgradeModal v-model:show="showPremiumModal">
             <strong>PDF Reports</strong> are only available in solidtime Professional.
         </UpgradeModal>

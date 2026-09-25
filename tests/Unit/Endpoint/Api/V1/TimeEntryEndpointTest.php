@@ -995,13 +995,46 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
 
         // Assert
         $this->assertResponseCode($response, 200);
-        $options = $capturedOptions();
-        $this->assertIsArray($options);
+        $dispositions = array_column($capturedOptions(), 'ResponseContentDisposition');
+        $this->assertCount(1, $dispositions);
         $this->assertMatchesRegularExpression(
             '/^attachment; filename="time-entries-export-.+\.csv"$/',
-            $options['ResponseContentDisposition'] ?? ''
+            $dispositions[0]
         );
         $this->assertStringStartsWith('https://storage.fake/exports/', $response->json('download_url'));
+        $response->assertJson(['preview_url' => null]);
+    }
+
+    public function test_index_export_endpoint_requests_a_pdf_preview_url_inline_and_the_download_url_as_an_attachment(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'time-entries:view:all',
+        ]);
+        TimeEntry::factory()->forOrganization($data->organization)->forMember($data->member)->startWithDuration(Carbon::now(), 100)->create();
+        Passport::actingAs($data->user);
+        $this->actAsOrganizationWithSubscription();
+        $capturedOptions = $this->captureTemporaryUrlOptions();
+
+        // Act
+        $response = $this->getJson(route('api.v1.time-entries.index-export', [
+            $data->organization->getKey(),
+            'format' => ExportFormat::PDF,
+            'start' => Carbon::now()->startOfYear()->toIso8601ZuluString(),
+            'end' => Carbon::now()->endOfYear()->toIso8601ZuluString(),
+        ]));
+
+        // Assert
+        $this->assertResponseCode($response, 200);
+        $dispositions = array_column($capturedOptions(), 'ResponseContentDisposition');
+        $this->assertCount(2, $dispositions);
+        $this->assertMatchesRegularExpression(
+            '/^attachment; filename="time-entries-export-.+\.pdf"$/',
+            $dispositions[0]
+        );
+        $this->assertSame(str_replace('attachment;', 'inline;', $dispositions[0]), $dispositions[1]);
+        $this->assertStringStartsWith('https://storage.fake/exports/', $response->json('download_url'));
+        $this->assertStringStartsWith('https://storage.fake/exports/', $response->json('preview_url'));
     }
 
     public function test_index_export_endpoint_can_create_a_detailed_time_entry_report_in_format_ods(): void
@@ -1511,13 +1544,49 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
 
         // Assert
         $this->assertResponseCode($response, 200);
-        $options = $capturedOptions();
-        $this->assertIsArray($options);
+        $dispositions = array_column($capturedOptions(), 'ResponseContentDisposition');
+        $this->assertCount(1, $dispositions);
         $this->assertMatchesRegularExpression(
             '/^attachment; filename="time-entries-report-.+\.csv"$/',
-            $options['ResponseContentDisposition'] ?? ''
+            $dispositions[0]
         );
         $this->assertStringStartsWith('https://storage.fake/exports/', $response->json('download_url'));
+        $response->assertJson(['preview_url' => null]);
+    }
+
+    public function test_aggregate_export_endpoint_requests_a_pdf_preview_url_inline_and_the_download_url_as_an_attachment(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'time-entries:view:all',
+        ]);
+        TimeEntry::factory()->forOrganization($data->organization)->forMember($data->member)->startWithDuration(Carbon::now(), 100)->create();
+        Passport::actingAs($data->user);
+        $this->actAsOrganizationWithSubscription();
+        $capturedOptions = $this->captureTemporaryUrlOptions();
+
+        // Act
+        $response = $this->getJson(route('api.v1.time-entries.aggregate-export', [
+            $data->organization->getKey(),
+            'format' => ExportFormat::PDF,
+            'group' => TimeEntryAggregationType::Client,
+            'sub_group' => TimeEntryAggregationType::Project,
+            'history_group' => TimeEntryAggregationTypeInterval::Month,
+            'start' => Carbon::now()->startOfYear()->toIso8601ZuluString(),
+            'end' => Carbon::now()->endOfYear()->toIso8601ZuluString(),
+        ]));
+
+        // Assert
+        $this->assertResponseCode($response, 200);
+        $dispositions = array_column($capturedOptions(), 'ResponseContentDisposition');
+        $this->assertCount(2, $dispositions);
+        $this->assertMatchesRegularExpression(
+            '/^attachment; filename="time-entries-report-.+\.pdf"$/',
+            $dispositions[0]
+        );
+        $this->assertSame(str_replace('attachment;', 'inline;', $dispositions[0]), $dispositions[1]);
+        $this->assertStringStartsWith('https://storage.fake/exports/', $response->json('download_url'));
+        $this->assertStringStartsWith('https://storage.fake/exports/', $response->json('preview_url'));
     }
 
     public function test_aggregate_export_endpoints_can_create_a_csv_report_as_employee_role_with_show_billable_rate(): void

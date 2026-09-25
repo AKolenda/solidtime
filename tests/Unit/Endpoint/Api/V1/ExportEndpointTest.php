@@ -116,9 +116,10 @@ class ExportEndpointTest extends ApiEndpointTestAbstract
 
         // Assert
         $response->assertStatus(200);
-        $options = $capturedOptions();
-        $this->assertIsArray($options);
-        $this->assertSame('attachment; filename="export_test.zip"', $options['ResponseContentDisposition'] ?? null);
+        $this->assertSame(
+            ['attachment; filename="export_test.zip"'],
+            array_column($capturedOptions(), 'ResponseContentDisposition')
+        );
         $this->assertSame('https://storage.fake/'.$filepath, $response->json('download_url'));
     }
 }

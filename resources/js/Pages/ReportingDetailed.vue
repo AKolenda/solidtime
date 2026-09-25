@@ -198,6 +198,7 @@ const selectedTimeEntries = ref<TimeEntry[]>([]);
 
 const showExportModal = ref(false);
 const exportUrl = ref<string | null>(null);
+const previewUrl = ref<string | null>(null);
 const showPremiumModal = ref(false);
 const exportLoading = ref(false);
 
@@ -277,6 +278,7 @@ async function downloadExport(format: ExportFormat) {
         if (response?.download_url) {
             showExportModal.value = true;
             exportUrl.value = response.download_url as string;
+            previewUrl.value = response.preview_url as string | null;
         }
     }
 }
@@ -286,7 +288,8 @@ async function downloadExport(format: ExportFormat) {
     <AppLayout title="Reporting" data-testid="reporting_view" class="overflow-hidden">
         <ReportingExportModal
             v-model:show="showExportModal"
-            :export-url="exportUrl"></ReportingExportModal>
+            :export-url="exportUrl"
+            :preview-url="previewUrl"></ReportingExportModal>
         <UpgradeModal v-model:show="showPremiumModal">
             <strong>PDF Reports</strong> are only available in solidtime Professional.
         </UpgradeModal>

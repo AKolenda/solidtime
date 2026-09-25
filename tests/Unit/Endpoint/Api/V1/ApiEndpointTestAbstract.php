@@ -22,22 +22,22 @@ class ApiEndpointTestAbstract extends TestCaseWithDatabase
 
     /**
      * Replaces the temporary URL builder of the private disk to capture the options
-     * passed to temporaryUrl. Returns a closure that yields the captured options.
+     * passed to temporaryUrl. Returns a closure that yields the options of every call in order.
      *
-     * @return Closure(): (array<string, mixed>|null)
+     * @return Closure(): array<int, array<string, mixed>>
      */
     protected function captureTemporaryUrlOptions(): Closure
     {
-        $captured = null;
+        $captured = [];
         Storage::disk(config('filesystems.private'))->buildTemporaryUrlsUsing(
             function (string $path, DateTimeInterface $expiration, array $options) use (&$captured): string {
-                $captured = $options;
+                $captured[] = $options;
 
                 return 'https://storage.fake/'.$path;
             }
         );
 
-        return function () use (&$captured): ?array {
+        return function () use (&$captured): array {
             return $captured;
         };
     }

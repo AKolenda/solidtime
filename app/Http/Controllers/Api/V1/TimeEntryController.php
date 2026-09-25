@@ -370,6 +370,10 @@ class TimeEntryController extends Controller
                     ->temporaryUrl($path, now()->addMinutes(5), [
                         'ResponseContentDisposition' => 'attachment; filename="'.$filename.'"',
                     ]),
+                'preview_url' => $format === ExportFormat::PDF ? Storage::disk(config('filesystems.private'))
+                    ->temporaryUrl($path, now()->addMinutes(5), [
+                        'ResponseContentDisposition' => 'inline; filename="'.$filename.'"',
+                    ]) : null,
             ]);
         } finally {
             $pdfExportLock?->release();
@@ -586,6 +590,10 @@ class TimeEntryController extends Controller
                 ->temporaryUrl($path, now()->addMinutes(5), [
                     'ResponseContentDisposition' => 'attachment; filename="'.$filename.'"',
                 ]),
+            'preview_url' => $format === ExportFormat::PDF ? Storage::disk(config('filesystems.private'))
+                ->temporaryUrl($path, now()->addMinutes(5), [
+                    'ResponseContentDisposition' => 'inline; filename="'.$filename.'"',
+                ]) : null,
         ]);
     }
 

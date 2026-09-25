@@ -4621,7 +4621,9 @@ If the group parameters are all set to &#x60;null&#x60; or are all missing, the 
             },
         ],
         response: z.union([
-            z.object({ download_url: z.string() }).passthrough(),
+            z
+                .object({ download_url: z.string(), preview_url: z.string().nullable() })
+                .passthrough(),
             z.object({ html: z.string(), footer_html: z.string() }).passthrough(),
         ]),
         errors: [
@@ -4759,7 +4761,9 @@ If the group parameters are all set to &#x60;null&#x60; or are all missing, the 
             },
         ],
         response: z.union([
-            z.object({ download_url: z.string() }).passthrough(),
+            z
+                .object({ download_url: z.string(), preview_url: z.string().nullable() })
+                .passthrough(),
             z.object({ html: z.string(), footer_html: z.string() }).passthrough(),
         ]),
         errors: [
