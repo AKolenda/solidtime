@@ -20,7 +20,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\Pivot;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -187,7 +186,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
     }
 
     /**
-     * @return BelongsToMany<Organization, $this, Pivot, 'membership'>
+     * @return BelongsToMany<Organization, $this, Member, 'membership'>
      */
     public function organizations(): BelongsToMany
     {
@@ -202,7 +201,7 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
     }
 
     /**
-     * @return BelongsToMany<Organization, $this, Pivot, 'membership'>
+     * @return BelongsToMany<Organization, $this, Member, 'membership'>
      */
     public function ownedOrganizations(): BelongsToMany
     {

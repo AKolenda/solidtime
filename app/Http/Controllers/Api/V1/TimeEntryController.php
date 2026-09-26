@@ -57,6 +57,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use LogicException;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\TemporaryDirectory\TemporaryDirectory;
 
@@ -192,8 +193,9 @@ class TimeEntryController extends Controller
         $roundingMinutes = $canAccessPremiumFeatures ? $request->getRoundingMinutes() : null;
         if ($roundingType !== null && $roundingMinutes !== null) {
             $select = array_diff($select, ['start', 'end']);
-            $select[] = DB::raw(app(TimeEntryService::class)->getStartSelectRawForRounding($roundingType, $roundingMinutes).' as start');
-            $select[] = DB::raw(app(TimeEntryService::class)->getEndSelectRawForRounding($roundingType, $roundingMinutes).' as end');
+            // These SQL fragments are generated from a rounding enum and validated minute count.
+            $select[] = DB::raw(app(TimeEntryService::class)->getStartSelectRawForRounding($roundingType, $roundingMinutes).' as start'); // @phpstan-ignore argument.type
+            $select[] = DB::raw(app(TimeEntryService::class)->getEndSelectRawForRounding($roundingType, $roundingMinutes).' as end'); // @phpstan-ignore argument.type
         }
         $timeEntriesQuery = TimeEntry::query()
             ->whereBelongsTo($organization, 'organization')
@@ -281,7 +283,7 @@ class TimeEntryController extends Controller
                 }
                 $viewFile = file_get_contents(resource_path('views/reports/time-entry-index/pdf.blade.php'));
                 if ($viewFile === false) {
-                    throw new \LogicException('View file not found');
+                    throw new LogicException('View file not found');
                 }
                 $timeEntries = $timeEntriesQuery->get();
                 $projectNames = $timeEntries->pluck('project.name')->filter()->unique()->values();
@@ -320,7 +322,7 @@ class TimeEntryController extends Controller
                 ]);
                 $footerViewFile = file_get_contents(resource_path('views/reports/time-entry-index/pdf-footer.blade.php'));
                 if ($footerViewFile === false) {
-                    throw new \LogicException('View file not found');
+                    throw new LogicException('View file not found');
                 }
                 $footerHtml = Blade::render($footerViewFile, [
                     'shopReport' => $shopReport,
@@ -533,7 +535,7 @@ class TimeEntryController extends Controller
             ]);
             $viewFile = file_get_contents(resource_path('views/reports/time-entry-aggregate/pdf.blade.php'));
             if ($viewFile === false) {
-                throw new \LogicException('View file not found');
+                throw new LogicException('View file not found');
             }
             $html = Blade::render($viewFile, [
                 'aggregatedData' => $aggregatedData,
@@ -550,7 +552,7 @@ class TimeEntryController extends Controller
             ]);
             $footerViewFile = file_get_contents(resource_path('views/reports/time-entry-aggregate/pdf-footer.blade.php'));
             if ($footerViewFile === false) {
-                throw new \LogicException('View file not found');
+                throw new LogicException('View file not found');
             }
             $footerHtml = Blade::render($footerViewFile);
             if ($debug) {

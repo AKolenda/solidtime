@@ -8,6 +8,7 @@ use Closure;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
+use Mockery;
 use Tests\TestCaseWithDatabase;
 
 class ApiEndpointTestAbstract extends TestCaseWithDatabase
@@ -21,21 +22,24 @@ class ApiEndpointTestAbstract extends TestCaseWithDatabase
     }
 
     /**
-     * Replaces the temporary URL builder of the private disk to capture the options
-     * passed to temporaryUrl. Returns a closure that yields the options of every call in order.
+     * Captures the options passed to temporaryUrl on the private disk.
+     * Returns a closure that yields the options of every call in order.
      *
      * @return Closure(): array<int, array<string, mixed>>
      */
     protected function captureTemporaryUrlOptions(): Closure
     {
         $captured = [];
-        Storage::disk(config('filesystems.private'))->buildTemporaryUrlsUsing(
+        $diskName = config('filesystems.private');
+        $disk = Mockery::mock(Storage::disk($diskName))->makePartial();
+        $disk->shouldReceive('temporaryUrl')->andReturnUsing(
             function (string $path, DateTimeInterface $expiration, array $options) use (&$captured): string {
                 $captured[] = $options;
 
                 return 'https://storage.fake/'.$path;
             }
         );
+        Storage::set($diskName, $disk);
 
         return function () use (&$captured): array {
             return $captured;
