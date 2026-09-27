@@ -43,13 +43,13 @@ final readonly class DatabaseBackupConfiguration
         }
 
         return new self(
-            enabled: $stored?->enabled ?? (bool) config('database-backup.enabled'),
-            time: $stored?->time ?? (string) config('database-backup.time'),
-            timezone: $stored?->timezone ?? (string) config('database-backup.timezone'),
-            retentionDays: $stored?->retention_days ?? (int) config('database-backup.retention_days'),
-            subdirectory: $stored?->subdirectory ?? '',
+            enabled: $stored->enabled ?? (bool) config('database-backup.enabled'),
+            time: $stored->time ?? (string) config('database-backup.time'),
+            timezone: $stored->timezone ?? (string) config('database-backup.timezone'),
+            retentionDays: $stored->retention_days ?? (int) config('database-backup.retention_days'),
+            subdirectory: $stored->subdirectory ?? '',
             rootPath: $rootPath,
-            outputFormat: $stored?->output_format ?? 'sql',
+            outputFormat: $stored->output_format ?? 'sql',
             timeoutSeconds: (int) config('database-backup.timeout_seconds'),
         );
     }

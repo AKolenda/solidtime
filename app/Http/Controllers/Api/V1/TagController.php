@@ -97,11 +97,12 @@ class TagController extends Controller
 
         DB::transaction(function () use ($organization, $tag): void {
             // Detach the tag from its time entries instead of refusing the delete.
+            // The tag key is a stored UUID, so it is safe to embed in the SQL fragment.
             TimeEntry::query()
                 ->whereBelongsTo($organization, 'organization')
                 ->hasTag($tag)
                 ->toBase()
-                ->update(['tags' => DB::raw("tags - '".$tag->getKey()."'")]);
+                ->update(['tags' => DB::raw("tags - '".$tag->getKey()."'")]); // @phpstan-ignore argument.type
 
             $tag->delete();
         });

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\SelfHost;
 
 use FilesystemIterator;
+use SplFileInfo;
 use Throwable;
 
 class DatabaseBackupMountDiscovery
@@ -34,7 +35,7 @@ class DatabaseBackupMountDiscovery
                         break;
                     }
 
-                    if (! $item->isDir() || $item->isLink() || ! $item->isReadable() || ! $item->isWritable()) {
+                    if (! $item instanceof SplFileInfo || ! $item->isDir() || $item->isLink() || ! $item->isReadable() || ! $item->isWritable()) {
                         continue;
                     }
 
@@ -69,8 +70,10 @@ class DatabaseBackupMountDiscovery
         }
 
         $recommendedPath = $this->recommendedPath(array_keys($candidates), $configuredDestination);
-        $candidates[$recommendedPath]['recommended'] = true;
-        $result = array_values($candidates);
+        $result = array_map(
+            fn (array $candidate): array => [...$candidate, 'recommended' => $candidate['path'] === $recommendedPath],
+            array_values($candidates)
+        );
         usort($result, fn (array $left, array $right): int => $left['recommended'] === $right['recommended']
             ? strnatcasecmp($left['path'], $right['path'])
             : ($left['recommended'] ? -1 : 1));
@@ -96,7 +99,7 @@ class DatabaseBackupMountDiscovery
 
             $mountPoint = $this->normalizePath((string) preg_replace_callback(
                 '/\\\\([0-7]{3})/',
-                fn (array $matches): string => chr(octdec($matches[1])),
+                fn (array $matches): string => chr((int) octdec($matches[1])),
                 $fields[4]
             ));
             $mountPoints[$mountPoint] = true;

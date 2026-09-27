@@ -67,7 +67,7 @@ final readonly class ProjectReportSummary
             ->all();
 
         $taskTotals = $timeEntries
-            ->groupBy(fn (TimeEntry $entry): string => $entry->task?->name ?? 'No task')
+            ->groupBy(fn (TimeEntry $entry): string => $entry->task->name ?? 'No task')
             ->map(function (Collection $entries, string $name) use ($durationOf, $isRunning, $operationOf, $operationsWithRunning, $runningPerPiece, $totalPerPiece): array {
                 $seconds = $durationOf($entries);
                 $taskName = $entries->first()?->task?->name;
@@ -89,12 +89,11 @@ final readonly class ProjectReportSummary
 
                 return sprintf('%d-%d-%s', $operationOrder, $taskOrder, $name);
             })
-            ->values()
             ->all();
 
         $runningSeconds = $durationOf($timeEntries->filter(fn (TimeEntry $entry): bool => $isRunning($entry->task?->name)));
         $operations = collect(['Turning', 'Milling'])->map(function (string $operation) use ($timeEntries, $durationOf, $isRunning, $runningPerPiece, $totalPerPiece): array {
-            $matching = $timeEntries->filter(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task?->name ?? ''), strtolower($operation)));
+            $matching = $timeEntries->filter(fn (TimeEntry $entry): bool => str_contains(strtolower($entry->task->name ?? ''), strtolower($operation)));
             $running = $durationOf($matching->filter(fn (TimeEntry $entry): bool => $isRunning($entry->task?->name)));
             $setup = $durationOf($matching->reject(fn (TimeEntry $entry): bool => $isRunning($entry->task?->name)));
 
@@ -104,7 +103,7 @@ final readonly class ProjectReportSummary
                 'running_seconds' => $running,
                 'seconds_per_piece' => $running > 0 ? $runningPerPiece($running) : $totalPerPiece($setup),
             ];
-        })->filter(fn (array $operation): bool => $operation['setup_seconds'] > 0 || $operation['running_seconds'] > 0)->values()->all();
+        })->filter(fn (array $operation): bool => $operation['setup_seconds'] > 0 || $operation['running_seconds'] > 0)->all();
 
         $operationAverages = array_filter(array_column($operations, 'seconds_per_piece'), fn (?float $value): bool => $value !== null);
         $secondsPerPiece = $operationAverages !== []
@@ -115,8 +114,8 @@ final readonly class ProjectReportSummary
             projectName: $projectName,
             purchaseOrder: $purchaseOrder,
             parts: $parts,
-            taskTotals: $taskTotals,
-            operations: $operations,
+            taskTotals: array_values($taskTotals),
+            operations: array_values($operations),
             runningSeconds: $runningSeconds > 0 ? $runningSeconds : null,
             totalQuantity: $totalQuantity > 0 ? $totalQuantity : null,
             secondsPerPiece: $secondsPerPiece,
