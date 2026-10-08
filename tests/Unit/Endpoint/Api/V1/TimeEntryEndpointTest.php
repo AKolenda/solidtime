@@ -1160,7 +1160,9 @@ class TimeEntryEndpointTest extends ApiEndpointTestAbstract
         $response->assertOk();
         $html = (string) $response->json('html');
         $this->assertStringContainsString('Production time report', $html);
-        $this->assertStringContainsString('Project 639893 - 47321 - 10pcs - QT18.00 - QM6.00', $html);
+        $this->assertStringContainsString('Purchase order 47321', $html);
+        $this->assertStringNotContainsString('Project 639893', $html);
+        $this->assertStringContainsString('<div class="meta-grid">', $html);
         $this->assertStringContainsString('<th>User</th><th>Duration</th><th>Notes</th><th>Tags</th>', $html);
         $this->assertStringContainsString('class="user-heading"', $html);
         $this->assertStringContainsString('class="operation-header-row"', $html);
