@@ -108,11 +108,11 @@ async function setOpen(value: boolean) {
         <PopoverContent
             align="start"
             :collision-padding="12"
-            class="max-w-[calc(100vw-24px)] max-h-[calc(100dvh-24px)] overflow-y-auto rounded-lg border border-card-border bg-secondary text-text-primary shadow-dropdown"
+            class="flex flex-col max-w-[calc(100vw-24px)] max-h-[var(--reka-popover-content-available-height,calc(100dvh-24px))] overflow-y-auto rounded-lg border border-card-border bg-secondary text-text-primary shadow-dropdown"
             @open-auto-focus="focusEditor"
             @escape-key-down="saving && $event.preventDefault()"
             @interact-outside="saving && $event.preventDefault()">
-            <div ref="editorPanel" tabindex="-1" class="outline-none">
+            <div ref="editorPanel" tabindex="-1" class="flex min-h-0 flex-col outline-none">
                 <p v-if="loading" class="p-4 text-sm" role="status">Loading original times…</p>
                 <p v-else-if="error" class="p-4 text-sm text-red-600" role="alert">{{ error }}</p>
                 <DetailedReportFieldEditor

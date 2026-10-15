@@ -239,7 +239,7 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
 <template>
     <ComboboxRoot as-child :open="listField" :ignore-filter="true">
         <form
-            class="p-2 space-y-2 w-max max-w-full"
+            class="flex min-h-0 flex-col gap-2 p-2 w-max max-w-full"
             :aria-label="`Edit ${label.toLowerCase()}`"
             :aria-busy="saving"
             @submit.prevent="submit">
@@ -274,7 +274,7 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                 ? {{ clientsById.get(selectedClient ?? '') ?? 'No client' }} ? Choose project
             </button>
             <template v-if="listField">
-                <div class="space-y-2">
+                <div class="flex min-h-0 flex-col gap-2">
                     <ComboboxAnchor v-if="field !== 'billable'">
                         <ComboboxInput
                             v-model="search"
@@ -283,11 +283,14 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                             class="report-edit-input"
                             :disabled="saving" />
                     </ComboboxAnchor>
-                    <ComboboxContent position="inline" :dismiss-able="false">
+                    <ComboboxContent
+                        position="inline"
+                        :dismiss-able="false"
+                        class="flex min-h-0 flex-col">
                         <ComboboxViewport
                             :ref="setResizablePanel"
                             :style="resizablePanelStyle"
-                            class="w-80 max-w-[calc(100vw-40px)] max-h-60 overflow-y-auto">
+                            class="w-80 max-w-[calc(100vw-40px)] max-h-60 min-h-0 overflow-y-auto">
                             <ComboboxVirtualizer
                                 v-slot="{ option }"
                                 :options="filteredOptions"
@@ -364,7 +367,7 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                     :required="field !== 'description'" />
             </label>
             <p v-if="error" role="alert" class="text-sm text-red-600 max-w-sm">{{ error }}</p>
-            <div class="flex items-center justify-between gap-2">
+            <div class="flex shrink-0 items-center justify-between gap-2">
                 <div v-if="!listField || field === 'tags'" class="ml-auto flex gap-2">
                     <button
                         type="button"
