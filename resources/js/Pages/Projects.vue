@@ -36,7 +36,7 @@ import { useTasksQuery } from '@/utils/useTasksQuery';
 import { projectMatchesSearch } from '@/utils/projectSearch';
 import ProjectDetailedPdfExportModal from '@/Components/Common/Project/ProjectDetailedPdfExportModal.vue';
 import ReportingExportModal from '@/Components/Common/Reporting/ReportingExportModal.vue';
-import UpgradeModal from '@/Components/Common/UpgradeModal.vue';
+import UpgradeModal from '@/packages/ui/src/UpgradeModal.vue';
 import { useNotificationsStore } from '@/utils/notification';
 import { getDayJsInstance, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import DateRangePicker from '@/packages/ui/src/Input/DateRangePicker.vue';
@@ -287,9 +287,7 @@ async function exportDetailedPdf() {
             v-model:show="showExportReadyModal"
             :export-url="exportUrl"
             :preview-url="previewUrl" />
-        <UpgradeModal v-model:show="showPremiumModal">
-            <strong>PDF Reports</strong> are only available in solidtime Professional.
-        </UpgradeModal>
+        <UpgradeModal v-model:show="showPremiumModal" feature="pdf-reports" />
         <MainContainer class="py-3 sm:pt-5">
             <div
                 data-testid="project_toolbar"

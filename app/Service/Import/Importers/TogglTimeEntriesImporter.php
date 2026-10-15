@@ -118,7 +118,7 @@ class TogglTimeEntriesImporter extends DefaultImporter
                 if (! in_array($record['Billable'], ['Yes', 'No'], true)) {
                     throw new ImportException('Invalid billable value');
                 }
-                $timeEntry->billable = $record['Billable'] === 'Yes';
+                $timeEntry->billable = $this->canUseBillableRates && $record['Billable'] === 'Yes';
                 $timeEntry->tags = $this->getTags($record['Tags']);
                 $timeEntry->is_imported = true;
                 try {
@@ -138,6 +138,9 @@ class TogglTimeEntriesImporter extends DefaultImporter
                 }
                 if ($end === null) {
                     throw new ImportException('End date ("'.$record['End date'].'") or time ("'.$record['End time'].'") are invalid');
+                }
+                if ($end->lt($start)) {
+                    throw new ImportException('End ("'.$record['End date'].' '.$record['End time'].'") is before start ("'.$record['Start date'].' '.$record['Start time'].'")');
                 }
                 $timeEntry->end = $end->utc();
                 $timeEntry->billable_rate = $this->billableRateService->getBillableRateForTimeEntryWithGivenRelations(

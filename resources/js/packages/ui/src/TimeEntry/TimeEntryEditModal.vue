@@ -17,6 +17,7 @@ import type {
 } from '@/packages/api/src';
 import TagDropdown from '@/packages/ui/src/Tag/TagDropdown.vue';
 import BillableIcon from '@/packages/ui/src/Icons/BillableIcon.vue';
+import { useBillableRatesLock } from '@/packages/ui/src/utils/useBillableRatesLock';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '..';
 import { Button } from '@/packages/ui/src/Buttons';
 import DatePicker from '@/packages/ui/src/Input/DatePicker.vue';
@@ -114,6 +115,8 @@ const taskProxy = computed({
     },
 });
 
+const { locked: billableRatesLocked } = useBillableRatesLock();
+
 watch(
     () => props.timeEntry,
     (newTimeEntry) => {
@@ -190,6 +193,11 @@ async function deleteEntry() {
         }
     }
 }
+
+// Organizations with locked billable rates can not make a non-billable time entry billable
+const billableOptionLocked = computed(
+    () => billableRatesLocked.value && !props.timeEntry?.billable
+);
 
 const billableProxy = computed({
     get: () =>
@@ -327,7 +335,9 @@ const typeProxy = computed({
                                 </SelectValue>
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="true">Billable</SelectItem>
+                                <SelectItem value="true" :disabled="billableOptionLocked"
+                                    >Billable</SelectItem
+                                >
                                 <SelectItem value="false">Non Billable</SelectItem>
                             </SelectContent>
                         </Select>
