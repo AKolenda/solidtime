@@ -92,19 +92,20 @@ function toggleArchived() {
                     <span class="truncate">{{ targetLabel }}</span>
                 </div>
                 <div
-                    class="whitespace-nowrap flex items-center px-3 py-4 text-sm text-text-primary"
+                    class="whitespace-nowrap min-w-0 flex items-center px-3 py-4 text-sm text-text-primary"
                     data-testid="goal_target_description">
-                    {{ targetDescription }}
+                    <span class="truncate">{{ targetDescription }}</span>
                 </div>
                 <!-- Like the progress in the project table, the cells without vertical padding keep the row as high as the other tables -->
                 <div class="min-w-0 flex items-center px-3 text-sm text-text-primary">
                     <GoalScopeBadges :goal="goal"></GoalScopeBadges>
                 </div>
-                <div class="whitespace-nowrap flex items-center px-3 text-sm text-text-primary">
+                <div
+                    class="whitespace-nowrap min-w-0 overflow-hidden flex items-center px-3 text-sm text-text-primary">
                     <GoalProgressBar :goal="goal" class="max-w-44"></GoalProgressBar>
                 </div>
                 <div
-                    class="whitespace-nowrap flex items-center px-3 py-4 text-sm text-text-primary">
+                    class="whitespace-nowrap min-w-0 overflow-hidden flex items-center px-3 py-4 text-sm text-text-primary">
                     <GoalStatusBadge :status="goal.progress.status"></GoalStatusBadge>
                 </div>
                 <div
@@ -118,6 +119,8 @@ function toggleArchived() {
                         @archive="toggleArchived"
                         @delete="deleteGoal"></GoalMoreOptionsDropdown>
                 </div>
+                <!-- Filler cell for the table's leftover width -->
+                <div></div>
                 <GoalEditModal v-model:show="showEditModal" :goal="goal"></GoalEditModal>
             </TableRow>
         </ContextMenuTrigger>
