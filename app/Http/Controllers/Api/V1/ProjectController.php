@@ -94,6 +94,8 @@ class ProjectController extends Controller
      * @throws AuthorizationException
      *
      * @operationId createProject
+     *
+     * @response ProjectResource
      */
     public function store(Organization $organization, ProjectStoreRequest $request, ApiCreationIdempotency $idempotency): JsonResource|JsonResponse
     {

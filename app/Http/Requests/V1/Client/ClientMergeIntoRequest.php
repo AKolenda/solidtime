@@ -7,6 +7,7 @@ namespace App\Http\Requests\V1\Client;
 use App\Http\Requests\V1\BaseFormRequest;
 use App\Models\Client;
 use App\Models\Organization;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Korridor\LaravelModelValidationRules\Rules\ExistsEloquent;
@@ -20,22 +21,21 @@ class ClientMergeIntoRequest extends BaseFormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, array<string|ValidationRule>>
+     * @return array<string, array<string|ValidationRule|Closure>>
      */
     public function rules(): array
     {
-        $sourceId = $this->client->getKey();
-        $allowedNameIds = array_values(array_filter([
-            $sourceId,
-            is_string($this->input('client_id')) ? $this->input('client_id') : null,
-        ]));
-
         return [
             // ID of the client that keeps the projects (destination)
             'client_id' => [
                 'required',
                 'string',
-                'not_in:'.$sourceId,
+                // The source client is read when the rule runs, so API docs generation can evaluate rules() without route model binding
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if ($value === $this->client->getKey()) {
+                        $fail('validation.not_in')->translate();
+                    }
+                },
                 ExistsEloquent::make(Client::class, null, function (Builder $builder): Builder {
                     /** @var Builder<Client> $builder */
                     return $builder->whereBelongsTo($this->organization, 'organization');
@@ -46,7 +46,11 @@ class ClientMergeIntoRequest extends BaseFormRequest
                 'required',
                 'string',
                 'uuid',
-                'in:'.implode(',', $allowedNameIds),
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! in_array($value, [$this->client->getKey(), $this->input('client_id')], true)) {
+                        $fail('validation.in')->translate();
+                    }
+                },
             ],
         ];
     }

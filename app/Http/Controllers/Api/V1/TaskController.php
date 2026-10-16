@@ -95,11 +95,13 @@ class TaskController extends Controller
      * @throws AuthorizationException
      *
      * @operationId createTask
+     *
+     * @response TaskResource
      */
     public function store(Organization $organization, TaskStoreRequest $request, ApiCreationIdempotency $idempotency): JsonResource|JsonResponse
     {
         if ($request->hasHeader('Idempotency-Key')) {
-            $request->validate(['project_id' => $request->creationRules()['project_id']]);
+            $request->validateProjectId();
         }
         /** @var Project $project */
         $project = Project::query()->findOrFail($request->input('project_id'));
