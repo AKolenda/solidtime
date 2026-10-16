@@ -62,7 +62,8 @@ return [
 
         'pgsql_test' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL', env('DATABASE_URL')),
+            // Deliberately not DB_URL or DATABASE_URL, so tests never run against the database of the application
+            'url' => env('DB_TEST_URL'),
             'host' => env('DB_TEST_HOST', '127.0.0.1'),
             'port' => env('DB_TEST_PORT', '5432'),
             'database' => env('DB_TEST_DATABASE', 'forge'),
