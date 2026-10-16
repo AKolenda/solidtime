@@ -8,11 +8,15 @@ use App\Models\Organization;
 use App\Service\Import\Importers\ImporterProvider;
 use App\Service\Import\Importers\ImportException;
 use App\Service\Import\ImportService;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Mockery;
 use PHPUnit\Framework\Attributes\CoversClass;
+use RuntimeException;
 use Tests\TestCase;
 
 #[CoversClass(ImportService::class)]
@@ -109,5 +113,23 @@ class ImportServiceTest extends TestCase
         $this->assertCount(2, $storedFiles);
         $this->assertNotContains('import/2026-09-14-old-copy', $storedFiles);
         $this->assertContains('import/2026-09-15-kept-copy', $storedFiles);
+    }
+
+    public function test_import_succeeds_if_the_copy_of_the_import_data_can_not_be_stored(): void
+    {
+        // Arrange
+        $data = Storage::disk('testfiles')->get('toggl_time_entries_import_test_1.csv');
+        $disk = Mockery::mock(Filesystem::class);
+        $disk->shouldReceive('put')->andThrow(new RuntimeException('Disk full'));
+        Storage::set(config('filesystems.private'), $disk);
+        Log::spy();
+        $organization = Organization::factory()->create();
+
+        // Act
+        $report = app(ImportService::class)->import($organization, 'toggl_time_entries', $data, 'Europe/Vienna');
+
+        // Assert
+        $this->assertSame(2, $report->timeEntriesCreated);
+        Log::shouldHaveReceived('warning')->once()->withArgs(fn (string $message): bool => $message === 'Failed to store the copy of the import data');
     }
 }

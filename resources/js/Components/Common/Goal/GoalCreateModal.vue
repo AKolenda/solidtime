@@ -30,6 +30,7 @@ watch(show, (isShown) => {
 });
 
 async function submit() {
+    if (saving.value) return;
     errors.value = validateGoalFormData(goal.value);
     if (Object.keys(errors.value).length > 0) {
         return;

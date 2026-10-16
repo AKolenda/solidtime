@@ -12,8 +12,10 @@ use App\Service\Import\Importers\ReportDto;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Throwable;
 
 class ImportService
 {
@@ -50,18 +52,27 @@ class ImportService
     /**
      * Keeps a copy of the import data for debugging. Copies older than the retention period are deleted,
      * so the copies do not fill up the disk.
+     * The import is already committed at this point, so a storage failure is only logged. Reporting the import as
+     * failed would make the user retry it and import the data twice.
      */
     private function storeImportCopy(Organization $organization, string $data): void
     {
-        $disk = Storage::disk(config('filesystems.private'));
-        $disk->put('import/'.Carbon::now()->toDateString().'-'.$organization->getKey().'-'.Str::uuid(), $data);
+        try {
+            $disk = Storage::disk(config('filesystems.private'));
+            $disk->put('import/'.Carbon::now()->toDateString().'-'.$organization->getKey().'-'.Str::uuid(), $data);
 
-        // The file names start with the date of the import, which sorts like the date itself
-        $oldestKeptDate = Carbon::now()->subDays(self::IMPORT_COPY_RETENTION_DAYS)->toDateString();
-        foreach ($disk->files('import') as $file) {
-            if (substr(basename($file), 0, 10) < $oldestKeptDate) {
-                $disk->delete($file);
+            // The file names start with the date of the import, which sorts like the date itself
+            $oldestKeptDate = Carbon::now()->subDays(self::IMPORT_COPY_RETENTION_DAYS)->toDateString();
+            foreach ($disk->files('import') as $file) {
+                if (substr(basename($file), 0, 10) < $oldestKeptDate) {
+                    $disk->delete($file);
+                }
             }
+        } catch (Throwable $exception) {
+            Log::warning('Failed to store the copy of the import data', [
+                'organization_id' => $organization->getKey(),
+                'exception' => $exception,
+            ]);
         }
     }
 }
