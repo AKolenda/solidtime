@@ -17,6 +17,8 @@ use Illuminate\Support\Str;
 
 class ImportService
 {
+    private const int IMPORT_COPY_RETENTION_DAYS = 30;
+
     /**
      * @throws ImportException
      */
@@ -25,13 +27,12 @@ class ImportService
         /** @var ImporterContract $importer */
         $importer = app(ImporterProvider::class)->getImporter($importerType);
         $importer->init($organization);
-        Storage::disk(config('filesystems.private'))
-            ->put('import/'.Carbon::now()->toDateString().'-'.$organization->getKey().'-'.Str::uuid(), $data);
 
         $lock = Cache::lock('import:'.$organization->getKey(), config('octane.max_execution_time', 60) + 1);
 
         if ($lock->get()) {
             try {
+                $this->storeImportCopy($organization, $data);
                 DB::transaction(function () use (&$importer, &$data, &$timezone): void {
                     $importer->importData($data, $timezone);
                 });
@@ -43,5 +44,23 @@ class ImportService
         }
 
         return $importer->getReport();
+    }
+
+    /**
+     * Keeps a copy of the import data for debugging. Copies older than the retention period are deleted,
+     * so the copies do not fill up the disk.
+     */
+    private function storeImportCopy(Organization $organization, string $data): void
+    {
+        $disk = Storage::disk(config('filesystems.private'));
+        $disk->put('import/'.Carbon::now()->toDateString().'-'.$organization->getKey().'-'.Str::uuid(), $data);
+
+        // The file names start with the date of the import, which sorts like the date itself
+        $oldestKeptDate = Carbon::now()->subDays(self::IMPORT_COPY_RETENTION_DAYS)->toDateString();
+        foreach ($disk->files('import') as $file) {
+            if (substr(basename($file), 0, 10) < $oldestKeptDate) {
+                $disk->delete($file);
+            }
+        }
     }
 }
