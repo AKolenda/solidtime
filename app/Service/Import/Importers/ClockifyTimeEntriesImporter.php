@@ -128,7 +128,7 @@ class ClockifyTimeEntriesImporter extends DefaultImporter
                     if (! in_array($record['Billable'], ['Yes', 'No'], true)) {
                         throw new ImportException('Invalid billable value');
                     }
-                    $timeEntry->billable = $record['Billable'] === 'Yes';
+                    $timeEntry->billable = $this->canUseBillableRates && $record['Billable'] === 'Yes';
                 }
                 if ($isBreak) {
                     // Breaks can not be billable or belong to a project/task (already skipped above)
@@ -189,6 +189,9 @@ class ClockifyTimeEntriesImporter extends DefaultImporter
                 }
                 if ($end === null) {
                     throw new ImportException('End date ("'.$endDateStr.'") or time ("'.$endTimeStr.'") are invalid');
+                }
+                if ($end->lt($start)) {
+                    throw new ImportException('End ("'.$endStr.'") is before start ("'.$startStr.'")');
                 }
                 $timeEntry->end = $end->utc();
 

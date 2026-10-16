@@ -35,7 +35,7 @@ return [
 
         'sqlite' => [
             'driver' => 'sqlite',
-            'url' => env('DB_URL'),
+            'url' => env('DB_URL', env('DATABASE_URL')),
             'database' => env('DB_DATABASE', database_path('database.sqlite')),
             'prefix' => '',
             'foreign_key_constraints' => env('DB_FOREIGN_KEYS', true),
@@ -47,7 +47,7 @@ return [
 
         'pgsql' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
+            'url' => env('DB_URL', env('DATABASE_URL')),
             'host' => env('DB_HOST', '127.0.0.1'),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'forge'),
@@ -57,12 +57,13 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
-            'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'sslmode' => env('DB_SSL_MODE', env('DB_SSLMODE', 'prefer')),
         ],
 
         'pgsql_test' => [
             'driver' => 'pgsql',
-            'url' => env('DB_URL'),
+            // Deliberately not DB_URL or DATABASE_URL, so tests never run against the database of the application
+            'url' => env('DB_TEST_URL'),
             'host' => env('DB_TEST_HOST', '127.0.0.1'),
             'port' => env('DB_TEST_PORT', '5432'),
             'database' => env('DB_TEST_DATABASE', 'forge'),
@@ -72,12 +73,12 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'public',
-            'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'sslmode' => env('DB_SSL_MODE', env('DB_SSLMODE', 'prefer')),
         ],
 
         'sqlsrv' => [
             'driver' => 'sqlsrv',
-            'url' => env('DB_URL'),
+            'url' => env('DB_URL', env('DATABASE_URL')),
             'host' => env('DB_HOST', 'localhost'),
             'port' => env('DB_PORT', '1433'),
             'database' => env('DB_DATABASE', 'laravel'),

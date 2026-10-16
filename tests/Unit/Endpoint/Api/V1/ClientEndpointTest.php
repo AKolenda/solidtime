@@ -6,9 +6,12 @@ namespace Tests\Unit\Endpoint\Api\V1;
 
 use App\Http\Controllers\Api\V1\ClientController;
 use App\Models\Client;
+use App\Models\Goal;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Report;
+use App\Models\TimeEntry;
+use App\Service\Dto\GoalFiltersDto;
 use Illuminate\Support\Carbon;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Passport\Passport;
@@ -775,5 +778,77 @@ class ClientEndpointTest extends ApiEndpointTestAbstract
         $response->assertStatus(204);
         $report->refresh();
         $this->assertSame([$destination->getKey()], $report->properties->clientIds?->values()->all());
+    }
+
+    public function test_merge_into_moves_time_entries_of_the_source_client_to_the_destination(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create();
+        $destination = Client::factory()->forOrganization($data->organization)->create();
+        $sourceProject = Project::factory()->forOrganization($data->organization)->forClient($source)->create();
+        $timeEntry = TimeEntry::factory()->forOrganization($data->organization)->forMember($data->member)->forProject($sourceProject)->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $destination->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(204);
+        $this->assertDatabaseMissing(Client::class, [
+            'id' => $source->getKey(),
+        ]);
+        $this->assertDatabaseHas(TimeEntry::class, [
+            'id' => $timeEntry->getKey(),
+            'project_id' => $sourceProject->getKey(),
+            'client_id' => $destination->getKey(),
+        ]);
+    }
+
+    public function test_merge_into_rewrites_goal_client_filters_to_the_destination(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'clients:update',
+        ]);
+        $source = Client::factory()->forOrganization($data->organization)->create();
+        $destination = Client::factory()->forOrganization($data->organization)->create();
+        $otherClient = Client::factory()->forOrganization($data->organization)->create();
+        $goalWithSource = Goal::factory()->forMember($data->member)
+            ->filters($this->clientFilter([$source->getKey(), $otherClient->getKey()]))->create();
+        $goalWithBothClients = Goal::factory()->forMember($data->member)
+            ->filters($this->clientFilter([$destination->getKey(), $source->getKey()]))->create();
+        $goalWithoutSource = Goal::factory()->forMember($data->member)
+            ->filters($this->clientFilter([$otherClient->getKey()]))->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.clients.merge-into', [$data->organization->getKey(), $source->getKey()]), [
+            'client_id' => $destination->getKey(),
+            'name_client_id' => $destination->getKey(),
+        ]);
+
+        // Assert
+        $response->assertStatus(204);
+        $this->assertSame([$destination->getKey(), $otherClient->getKey()], $goalWithSource->refresh()->filters->clientIds?->all());
+        // No duplicate if the destination was already in the filter
+        $this->assertSame([$destination->getKey()], $goalWithBothClients->refresh()->filters->clientIds?->all());
+        $this->assertSame([$otherClient->getKey()], $goalWithoutSource->refresh()->filters->clientIds?->all());
+    }
+
+    /**
+     * @param  array<string>  $clientIds
+     */
+    private function clientFilter(array $clientIds): GoalFiltersDto
+    {
+        $filters = new GoalFiltersDto;
+        $filters->setClientIds($clientIds);
+
+        return $filters;
     }
 }

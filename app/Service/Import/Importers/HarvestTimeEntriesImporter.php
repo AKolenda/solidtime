@@ -115,7 +115,7 @@ class HarvestTimeEntriesImporter extends DefaultImporter
                 if (! in_array($record['Billable?'], ['Yes', 'No'], true)) {
                     throw new ImportException('Invalid billable value');
                 }
-                $timeEntry->billable = $record['Billable?'] === 'Yes';
+                $timeEntry->billable = $this->canUseBillableRates && $record['Billable?'] === 'Yes';
                 $timeEntry->tags = [];
                 $timeEntry->is_imported = true;
 
@@ -136,6 +136,9 @@ class HarvestTimeEntriesImporter extends DefaultImporter
                     throw new ImportException('Hours ("'.$record['Hours'].'") is invalid');
                 }
                 $hours = (float) $hoursField;
+                if ($hours < 0) {
+                    throw new ImportException('Hours ("'.$record['Hours'].'") is negative');
+                }
                 $timeEntry->start = $date->copy()->startOfDay()->utc();
                 $timeEntry->end = $date->copy()->startOfDay()->addHours($hours)->utc();
                 $timeEntry->billable_rate = $this->billableRateService->getBillableRateForTimeEntryWithGivenRelations(

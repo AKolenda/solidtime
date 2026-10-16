@@ -134,7 +134,7 @@ class GenericTimeEntriesImporter extends DefaultImporter
                 if (! in_array($record['billable'], ['true', 'false'], true)) {
                     throw new ImportException('Invalid billable value');
                 }
-                $timeEntry->billable = $record['billable'] === 'true';
+                $timeEntry->billable = $this->canUseBillableRates && $record['billable'] === 'true';
                 $timeEntry->tags = $this->getTags($record['tags']);
                 $timeEntry->is_imported = true;
                 try {
@@ -154,6 +154,9 @@ class GenericTimeEntriesImporter extends DefaultImporter
                 }
                 if ($end === null) {
                     throw new ImportException('Value of end ("'.$record['end'].'") is invalid');
+                }
+                if ($end->lt($start)) {
+                    throw new ImportException('Value of end ("'.$record['end'].'") is before start ("'.$record['start'].'")');
                 }
                 $timeEntry->end = $end->utc();
                 $timeEntry->billable_rate = $this->billableRateService->getBillableRateForTimeEntryWithGivenRelations(

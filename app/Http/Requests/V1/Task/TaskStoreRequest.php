@@ -10,6 +10,7 @@ use App\Models\Project;
 use App\Models\Task;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Validator;
 use Korridor\LaravelModelValidationRules\Rules\ExistsEloquent;
 use Korridor\LaravelModelValidationRules\Rules\UniqueEloquent;
 
@@ -58,6 +59,16 @@ class TaskStoreRequest extends BaseFormRequest
                 'max:2147483647',
             ],
         ];
+    }
+
+    /**
+     * Keyed creation skips the request validation, but the project is needed for the permission check before the creation runs
+     */
+    public function validateProjectId(): void
+    {
+        Validator::make($this->all(), [
+            'project_id' => $this->creationRules()['project_id'],
+        ])->validate();
     }
 
     public function getEstimatedTime(): ?int

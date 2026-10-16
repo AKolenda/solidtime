@@ -95,6 +95,9 @@ async function submit() {
         () => {
             queryClient.invalidateQueries({ queryKey: ['clients'] });
             queryClient.invalidateQueries({ queryKey: ['projects'] });
+            // The time entries of the merged client move to the destination client
+            queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+            queryClient.invalidateQueries({ queryKey: ['goals'] });
             show.value = false;
         }
     );

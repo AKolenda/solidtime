@@ -11,15 +11,19 @@ import {
     canViewTags,
     canViewReport,
     canViewInvoices,
+    canViewGoals,
     canManageBilling,
     canUpdateOrganization,
     canCreateProjects,
     canCreateClients,
     canCreateTasks,
     canCreateTags,
+    canCreateGoals,
     canCreateInvitations,
 } from '@/utils/permissions';
 import { isBillingActivated, isInvoicingActivated } from '@/utils/billing';
+import { useQueryClient } from '@tanstack/vue-query';
+import { fetchCanCreateMoreGoals } from '@/utils/useGoalsQuery';
 import { useTimeEntriesInfiniteQuery } from '@/utils/useTimeEntriesInfiniteQuery';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { useClientsQuery } from '@/utils/useClientsQuery';
@@ -63,6 +67,8 @@ const showCreateProjectModal = ref(false);
 const showCreateClientModal = ref(false);
 const showCreateTaskModal = ref(false);
 const showCreateTagModal = ref(false);
+const showCreateGoalModal = ref(false);
+const showGoalUpgradeModal = ref(false);
 const showInviteMemberModal = ref(false);
 const showCreateTimeEntryModal = ref(false);
 
@@ -100,6 +106,7 @@ const ENTITY_ICONS: Record<string, typeof FolderIcon> = {
 };
 
 export function useCommandPalette() {
+    const queryClient = useQueryClient();
     const currentTimeEntryStore = useCurrentTimeEntryStore();
     const { currentTimeEntry, isActive } = storeToRefs(currentTimeEntryStore);
     const { setActiveState, updateTimer } = currentTimeEntryStore;
@@ -237,6 +244,15 @@ export function useCommandPalette() {
         showCreateTagModal.value = true;
     }
 
+    async function openCreateGoalModal() {
+        closePaletteAfterAction();
+        if (await fetchCanCreateMoreGoals(queryClient)) {
+            showCreateGoalModal.value = true;
+        } else {
+            showGoalUpgradeModal.value = true;
+        }
+    }
+
     function openInviteMemberModal() {
         closePaletteAfterAction();
         showInviteMemberModal.value = true;
@@ -259,6 +275,7 @@ export function useCommandPalette() {
                 canViewTags,
                 canViewReport,
                 canViewInvoices,
+                canViewGoals,
                 canManageBilling,
                 canUpdateOrganization,
             },
@@ -309,6 +326,7 @@ export function useCommandPalette() {
                 openClientModal: openCreateClientModal,
                 openTaskModal: openCreateTaskModal,
                 openTagModal: openCreateTagModal,
+                openGoalModal: openCreateGoalModal,
                 openInviteModal: openInviteMemberModal,
             },
             {
@@ -316,6 +334,7 @@ export function useCommandPalette() {
                 canCreateClients,
                 canCreateTasks,
                 canCreateTags,
+                canCreateGoals,
                 canCreateInvitations,
             }
         )
@@ -513,6 +532,8 @@ export function useCommandPalette() {
         showCreateClientModal,
         showCreateTaskModal,
         showCreateTagModal,
+        showCreateGoalModal,
+        showGoalUpgradeModal,
         showInviteMemberModal,
         showCreateTimeEntryModal,
         showProjectSelector,
