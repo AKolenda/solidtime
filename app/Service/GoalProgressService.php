@@ -71,7 +71,7 @@ class GoalProgressService
      * Seconds tracked in the given period that count towards the goal.
      * Counts the time entries of the member of the goal, or of every member for goals without a member.
      * Time entries are assigned to the period their start is in, like in the reporting.
-     * A running time entry counts with its elapsed time up to now.
+     * A running time entry counts with its elapsed time up to now, or not at all if it starts in the future.
      *
      * @param  Carbon  $periodStart  Start of the period (inclusive)
      * @param  Carbon  $periodEnd  End of the period (exclusive)
@@ -101,7 +101,7 @@ class GoalProgressService
 
         /** @var object{tracked_seconds: int|float|string|null} $row */
         $row = $timeEntryFilter->get()
-            ->selectRaw('coalesce(round(sum(extract(epoch from (coalesce("end", ?::timestamp) - "start")))), 0) as tracked_seconds', [Carbon::now()])
+            ->selectRaw('coalesce(round(sum(greatest(extract(epoch from (coalesce("end", ?::timestamp) - "start")), 0))), 0) as tracked_seconds', [Carbon::now()])
             ->toBase()
             ->first();
 

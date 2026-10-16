@@ -50,24 +50,37 @@ class ImportService
     }
 
     /**
-     * Keeps a copy of the import data for debugging. Copies older than the retention period are deleted,
-     * so the copies do not fill up the disk.
+     * Deletes the copies of import data that are older than the retention period, so they do not fill up the disk.
+     *
+     * @return int Number of deleted copies
+     */
+    public function pruneImportCopies(): int
+    {
+        $disk = Storage::disk(config('filesystems.private'));
+        // The file names start with the date of the import, which sorts like the date itself
+        $oldestKeptDate = Carbon::now()->subDays(self::IMPORT_COPY_RETENTION_DAYS)->toDateString();
+        $deleted = 0;
+        foreach ($disk->files('import') as $file) {
+            if (substr(basename($file), 0, 10) < $oldestKeptDate) {
+                $disk->delete($file);
+                $deleted++;
+            }
+        }
+
+        return $deleted;
+    }
+
+    /**
+     * Keeps a copy of the import data for debugging. The scheduled import:prune-copies command deletes
+     * the copies after the retention period.
      * The import is already committed at this point, so a storage failure is only logged. Reporting the import as
      * failed would make the user retry it and import the data twice.
      */
     private function storeImportCopy(Organization $organization, string $data): void
     {
         try {
-            $disk = Storage::disk(config('filesystems.private'));
-            $disk->put('import/'.Carbon::now()->toDateString().'-'.$organization->getKey().'-'.Str::uuid(), $data);
-
-            // The file names start with the date of the import, which sorts like the date itself
-            $oldestKeptDate = Carbon::now()->subDays(self::IMPORT_COPY_RETENTION_DAYS)->toDateString();
-            foreach ($disk->files('import') as $file) {
-                if (substr(basename($file), 0, 10) < $oldestKeptDate) {
-                    $disk->delete($file);
-                }
-            }
+            Storage::disk(config('filesystems.private'))
+                ->put('import/'.Carbon::now()->toDateString().'-'.$organization->getKey().'-'.Str::uuid(), $data);
         } catch (Throwable $exception) {
             Log::warning('Failed to store the copy of the import data', [
                 'organization_id' => $organization->getKey(),

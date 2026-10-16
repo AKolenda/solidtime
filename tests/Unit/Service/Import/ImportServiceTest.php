@@ -94,7 +94,7 @@ class ImportServiceTest extends TestCase
         }
     }
 
-    public function test_import_deletes_copies_of_import_data_older_than_the_retention_period(): void
+    public function test_prune_import_copies_deletes_copies_older_than_the_retention_period(): void
     {
         // Arrange
         $this->travelTo(Carbon::parse('2026-10-15 12:00:00'));
@@ -102,17 +102,13 @@ class ImportServiceTest extends TestCase
         $disk = Storage::disk(config('filesystems.private'));
         $disk->put('import/2026-09-14-old-copy', 'old');
         $disk->put('import/2026-09-15-kept-copy', 'kept');
-        $organization = Organization::factory()->create();
-        $data = Storage::disk('testfiles')->get('toggl_time_entries_import_test_1.csv');
 
         // Act
-        app(ImportService::class)->import($organization, 'toggl_time_entries', $data, 'Europe/Vienna');
+        $deleted = app(ImportService::class)->pruneImportCopies();
 
         // Assert
-        $storedFiles = $disk->files('import');
-        $this->assertCount(2, $storedFiles);
-        $this->assertNotContains('import/2026-09-14-old-copy', $storedFiles);
-        $this->assertContains('import/2026-09-15-kept-copy', $storedFiles);
+        $this->assertSame(1, $deleted);
+        $this->assertSame(['import/2026-09-15-kept-copy'], $disk->files('import'));
     }
 
     public function test_import_succeeds_if_the_copy_of_the_import_data_can_not_be_stored(): void

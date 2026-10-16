@@ -54,6 +54,9 @@ class Kernel extends ConsoleKernel
             }
         }
 
+        $schedule->command('import:prune-copies')
+            ->daily();
+
         $schedule->command('self-host:database-consistency')
             ->when(fn (): bool => config('scheduling.tasks.self_hosting_database_consistency'))
             ->everySixHours();

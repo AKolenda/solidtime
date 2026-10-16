@@ -307,6 +307,28 @@ class GoalProgressServiceTest extends TestCase
         $this->assertSame(600 + 1800, $trackedSeconds);
     }
 
+    public function test_progress_does_not_subtract_running_time_entry_that_starts_in_the_future(): void
+    {
+        // Arrange
+        $organization = Organization::factory()->create();
+        $member = Member::factory()->forOrganization($organization)->create();
+        $goal = Goal::factory()->forMember($member)->period(GoalPeriod::Day)->atLeast(3600)->create();
+        $now = Carbon::create(2024, 1, 3, 12, 0, 0, 'UTC');
+        TimeEntry::factory()->forMember($member)->forOrganization($organization)
+            ->startWithDuration($now->copy()->subHours(3), 600)
+            ->create();
+        TimeEntry::factory()->forMember($member)->forOrganization($organization)
+            ->start($now->copy()->addMinutes(30))
+            ->active()
+            ->create();
+
+        // Act
+        $trackedSeconds = $this->progressAt($goal, $now);
+
+        // Assert
+        $this->assertSame(600, $trackedSeconds);
+    }
+
     public function test_progress_does_not_count_running_time_entry_that_started_before_the_period(): void
     {
         // Arrange
