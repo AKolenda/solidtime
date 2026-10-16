@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Models\Client;
+use App\Models\Goal;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Report;
+use App\Models\TimeEntry;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class ClientService
 {
     /**
-     * Move the source client's projects onto the destination client, apply the chosen
-     * name, rewrite saved reports that filtered on the source client, and delete the source.
+     * Move the source client's projects and time entries onto the destination client, apply the
+     * chosen name, rewrite saved reports and goals that filtered on the source client, and delete the source.
      */
     public function mergeInto(Organization $organization, Client $source, Client $destination, string $nameClientId): void
     {
@@ -38,7 +40,14 @@ class ClientService
                 ->where('client_id', $source->getKey())
                 ->update(['client_id' => $destination->getKey()]);
 
+            // Time entries store the client of their project, and they still reference the source client
+            TimeEntry::query()
+                ->whereBelongsTo($organization, 'organization')
+                ->where('client_id', $source->getKey())
+                ->update(['client_id' => $destination->getKey()]);
+
             $this->rewriteReportClientIds($organization, $source->getKey(), $destination->getKey());
+            $this->rewriteGoalClientIds($organization, $source->getKey(), $destination->getKey());
 
             if ($nameClientId === $source->getKey()) {
                 $destination->name = $source->name;
@@ -71,6 +80,25 @@ class ClientService
             $properties->setClientIds($updated);
             $report->properties = $properties;
             $report->save();
+        }
+    }
+
+    private function rewriteGoalClientIds(Organization $organization, string $sourceId, string $destinationId): void
+    {
+        $goals = Goal::query()
+            ->whereBelongsTo($organization, 'organization')
+            ->whereJsonContains('filters->clientIds', $sourceId)
+            ->get();
+
+        foreach ($goals as $goal) {
+            $filters = $goal->filters;
+            $clientIds = $filters->clientIds?->map(
+                fn (string $id): string => $id === $sourceId ? $destinationId : $id
+            );
+            // The destination client may already be in the filter
+            $filters->setClientIds($clientIds?->unique()->values()->all());
+            $goal->filters = $filters;
+            $goal->save();
         }
     }
 }
