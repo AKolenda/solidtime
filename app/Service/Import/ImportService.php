@@ -32,10 +32,11 @@ class ImportService
 
         if ($lock->get()) {
             try {
-                $this->storeImportCopy($organization, $data);
                 DB::transaction(function () use (&$importer, &$data, &$timezone): void {
                     $importer->importData($data, $timezone);
                 });
+                // Only imported data is kept, so rejected or failed requests can not fill up the disk
+                $this->storeImportCopy($organization, $data);
             } finally {
                 $lock->release();
             }

@@ -60,10 +60,12 @@ class ImportServiceTest extends TestCase
         $importService = app(ImportService::class);
         try {
             $importService->import($organization, 'toggl_time_entries', $data, $timezone);
+            $this->fail('The import did not throw an exception');
         } catch (ImportException) {
             // Assert
             $lock = Cache::lock('import:'.$organization->getKey());
             $this->assertTrue($lock->get());
+            $this->assertSame([], Storage::disk(config('filesystems.private'))->files('import'));
         }
     }
 
