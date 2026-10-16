@@ -26,6 +26,7 @@ export const useTagsStore = defineStore('tags', () => {
             queryClient.invalidateQueries({ queryKey: ['tags'] });
             // Deleting a tag also removes it from the time entries that used it.
             queryClient.invalidateQueries({ queryKey: ['timeEntries'] });
+            queryClient.invalidateQueries({ queryKey: ['goals'] });
         }
     }
 
