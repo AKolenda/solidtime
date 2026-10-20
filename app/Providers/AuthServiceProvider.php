@@ -67,6 +67,7 @@ class AuthServiceProvider extends ServiceProvider
 
         // Passport::tokensExpireIn(now()->addDays(15));
         // Passport::refreshTokensExpireIn(now()->addDays(30));
-        Passport::personalAccessTokensExpireIn(now()->addMonths(12));
+        // API tokens should not expire. Passport always sets an expiry, so it is set far in the future.
+        Passport::personalAccessTokensExpireIn(now()->addYears(1000));
     }
 }

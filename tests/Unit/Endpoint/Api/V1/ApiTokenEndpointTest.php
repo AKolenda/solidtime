@@ -7,6 +7,7 @@ namespace Tests\Unit\Endpoint\Api\V1;
 use App\Http\Controllers\Api\V1\ApiTokenController;
 use App\Models\Passport\Client;
 use App\Models\Passport\Token;
+use Illuminate\Support\Carbon;
 use Laravel\Passport\ClientRepository;
 use Laravel\Passport\Passport;
 use PHPUnit\Framework\Attributes\UsesClass;
@@ -96,6 +97,7 @@ class ApiTokenEndpointTest extends ApiEndpointTestAbstract
                 'access_token',
             ],
         ]);
+        $this->assertTrue(Carbon::parse($response->json('data.expires_at'))->isAfter(now()->addYears(999)));
     }
 
     public function test_store_fails_if_personal_access_client_is_not_configured(): void
