@@ -2,7 +2,7 @@
 import FormSection from '@/Components/FormSection.vue';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import { computed, ref, inject, type ComputedRef } from 'vue';
-import { Field, FieldLabel, FieldDescription, FieldError } from '@/packages/ui/src/field';
+import { Field, FieldLabel, FieldError } from '@/packages/ui/src/field';
 import { api, type ApiToken, type CreateApiTokenBody } from '@/packages/api/src';
 import SectionBorder from '@/Components/SectionBorder.vue';
 import DangerButton from '@/packages/ui/src/Buttons/DangerButton.vue';
@@ -17,7 +17,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query';
 import { useNotificationsStore } from '@/utils/notification';
 import { useClipboard } from '@vueuse/core';
 import { formatDateTimeLocalized } from '../../../packages/ui/src/utils/time';
-import { ClockIcon } from '@heroicons/vue/20/solid';
 import type { Organization } from '@/packages/api/src';
 
 const queryClient = useQueryClient();
@@ -156,12 +155,6 @@ const revokeApiTokenMutation = useMutation({
                     <FieldError v-if="createApiTokenForm.errors.name">{{
                         createApiTokenForm.errors.name
                     }}</FieldError>
-                    <FieldDescription>
-                        <span class="flex space-x-1.5 items-center text-text-tertiary font-medium">
-                            <ClockIcon class="w-4"></ClockIcon>
-                            <span> API Tokens are valid for 1 year </span>
-                        </span>
-                    </FieldDescription>
                 </Field>
             </template>
 
@@ -257,7 +250,7 @@ const revokeApiTokenMutation = useMutation({
             <template #content>
                 <div>
                     Please copy your new API token. For your security, it won't be shown again.
-                    <strong>This token is valid for one year</strong> unless you revoke it.
+                    <strong>This token is valid until you revoke it.</strong>
                 </div>
 
                 <div></div>
