@@ -36,10 +36,25 @@ class TimeEntryUpdateRequest extends BaseFormRequest
      */
     public function rules(): array
     {
+        // A keyed update validates under its row lock, after the replay lookup, so a retry
+        // replays a successful update even if the entry has changed since.
+        if ($this->hasHeader('Idempotency-Key')) {
+            return [];
+        }
+        $timeEntry = $this->route('timeEntry');
+
+        return $this->updateRules($timeEntry instanceof TimeEntry ? $timeEntry : null);
+    }
+
+    /**
+     * The rules against the entry as it is now.
+     *
+     * @return array<string, array<string|Closure|ValidationRule|\Illuminate\Contracts\Validation\Rule|ProhibitedIf|ConditionalRules>>
+     */
+    public function updateRules(?TimeEntry $timeEntry): array
+    {
         // Break restrictions need to apply based on the type the entry will have after the
         // update, not only when the payload itself contains type=break.
-        $timeEntry = $this->route('timeEntry');
-        $timeEntry = $timeEntry instanceof TimeEntry ? $timeEntry : null;
         $resultingType = $this->has('type')
             ? TimeEntryType::tryFrom((string) $this->input('type'))
             : $timeEntry?->type;

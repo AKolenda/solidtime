@@ -57,6 +57,16 @@ class TimeEntryResource extends BaseResource
      */
     public static function etag(TimeEntry $timeEntry): string
     {
-        return hash('sha256', json_encode((new self($timeEntry))->toArray(request()), JSON_THROW_ON_ERROR));
+        return self::etagOf((new self($timeEntry))->toArray(request()));
+    }
+
+    /**
+     * The same fingerprint from the entry's array as an earlier response showed it.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public static function etagOf(array $data): string
+    {
+        return hash('sha256', json_encode($data, JSON_THROW_ON_ERROR));
     }
 }

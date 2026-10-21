@@ -57,31 +57,35 @@ class ApiCreationIdempotency
      * first response. With If-Match, the update runs only while the entry still has that ETag,
      * so a change made by someone else in between is refused (412) instead of overwritten.
      *
-     * @param  Closure(TimeEntry): JsonResource  $update  receives the locked entry
+     * @param  Closure(TimeEntry, array<string, mixed>): JsonResource  $update  receives the locked entry and the validated input
      */
     public function executeUpdate(TimeEntryUpdateRequest $request, Organization $organization, TimeEntry $timeEntry, Closure $update): JsonResource|JsonResponse
     {
         $key = $this->key($request);
         $ifMatch = $request->header('If-Match');
         if ($key === null && $ifMatch === null) {
-            return $update($timeEntry);
+            return $update($timeEntry, $request->validated());
         }
         $scope = $key === null ? null : $this->scope($request, $organization, 'time-entries:'.$timeEntry->getKey(), $key);
         $payloadHash = $this->payloadHash($request);
 
-        return DB::transaction(function () use ($organization, $timeEntry, $update, $scope, $payloadHash, $ifMatch): JsonResponse {
+        return DB::transaction(function () use ($request, $organization, $timeEntry, $update, $scope, $payloadHash, $ifMatch): JsonResponse {
             /** @var TimeEntry $locked */
             $locked = TimeEntry::query()->whereKey($timeEntry->getKey())->lockForUpdate()->firstOrFail();
             if ($scope !== null) {
                 $replay = $this->replay($scope, $payloadHash);
                 if ($replay !== null) {
-                    return $replay;
+                    // The ETag of the entry as that first update left it
+                    $data = $replay->getData(true)['data'] ?? null;
+
+                    return is_array($data) ? $replay->header('ETag', '"'.TimeEntryResource::etagOf($data).'"') : $replay;
                 }
             }
             if ($ifMatch !== null && ! hash_equals(TimeEntryResource::etag($locked), trim(str_replace('W/', '', $ifMatch), " \t\""))) {
                 abort(412, 'The time entry changed since it was read.');
             }
-            $response = $update($locked)->response();
+            $validated = $scope !== null ? Validator::make($request->all(), $request->updateRules($locked))->validate() : $request->validated();
+            $response = $update($locked, $validated)->response();
             if ($scope !== null) {
                 $this->record($scope, $organization, $payloadHash, $response);
                 $response->header('X-Solidtime-Idempotency', 'v1');

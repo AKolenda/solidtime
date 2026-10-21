@@ -82,4 +82,36 @@ class TimeEntryGuardedUpdateEndpointTest extends ApiEndpointTestAbstract
         $this->postJson($url, [...$payload, 'end' => '2026-10-21T15:00:00Z'], ['Idempotency-Key' => 'erp-entry-0000000001'])->assertJsonValidationErrorFor('start');
         Carbon::setTestNow();
     }
+
+    public function test_keyed_update_replays_with_its_etag_after_another_change(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:view:own', 'time-entries:update:own']);
+        $entry = $this->entry($data);
+        Passport::actingAs($data->user);
+        $url = route('api.v1.time-entries.update', [$data->organization->id, $entry->id]);
+        $headers = ['Idempotency-Key' => 'erp-stop-0000000003'];
+
+        $first = $this->putJson($url, ['end' => '2026-10-01T10:00:00Z'], $headers)->assertOk();
+        // Someone else moves the entry, so the first body would no longer pass validation
+        $entry->update(['start' => Carbon::parse('2026-10-01 11:00:00'), 'end' => Carbon::parse('2026-10-01 12:00:00')]);
+        $retry = $this->putJson($url, ['end' => '2026-10-01T10:00:00Z'], $headers)->assertOk();
+
+        $this->assertSame($first->json(), $retry->json());
+        $this->assertNotNull($first->headers->get('ETag'));
+        $this->assertSame($first->headers->get('ETag'), $retry->headers->get('ETag'));
+        $this->assertSame('2026-10-01 12:00:00', $entry->refresh()->end->toDateTimeString());
+    }
+
+    public function test_keyed_update_is_validated_against_the_locked_entry(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:view:own', 'time-entries:update:own']);
+        $entry = $this->entry($data);
+        Passport::actingAs($data->user);
+        $url = route('api.v1.time-entries.update', [$data->organization->id, $entry->id]);
+
+        $this->putJson($url, ['end' => '2026-10-01T07:00:00Z'], ['Idempotency-Key' => 'erp-stop-0000000004'])->assertJsonValidationErrorFor('end');
+        $this->putJson($url, ['member_id' => 'not-a-member'], ['Idempotency-Key' => 'erp-stop-0000000005'])->assertForbidden();
+        $this->assertDatabaseCount('api_creation_operations', 0);
+        $this->assertNull($entry->refresh()->end);
+    }
 }

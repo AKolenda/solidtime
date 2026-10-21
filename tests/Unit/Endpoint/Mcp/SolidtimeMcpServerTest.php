@@ -403,4 +403,20 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertSame('2026-10-21T14:00:00Z', $retry['start']);
         $this->assertSame(1, TimeEntry::query()->count());
     }
+
+    public function test_deletion_previews_count_entries_only_for_those_who_see_everyones_time(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $employee = $this->teammate($data->organization);
+        $project = Project::factory()->forOrganization($data->organization)->isPublic()->create();
+        $task = Task::factory()->forProject($project)->forOrganization($data->organization)->create();
+        TimeEntry::factory()->forMember($data->member)->forProject($project)->forTask($task)->count(3)->create();
+
+        Passport::actingAs($employee->user);
+        $this->assertStringNotContainsString('3 time entries', $this->ok('delete_project', ['project_id' => $project->id])['summary']);
+        $this->assertStringNotContainsString('3 time entries', $this->ok('delete_task', ['task_id' => $task->id])['summary']);
+
+        Passport::actingAs($data->user);
+        $this->assertStringContainsString('3 time entries', $this->ok('delete_task', ['task_id' => $task->id])['summary']);
+    }
 }

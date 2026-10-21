@@ -40,9 +40,13 @@ class DeleteTask extends WriteTool
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
         $task = $this->findTask($context, $input['task_id']);
-        $entries = TimeEntry::query()->whereBelongsTo($context->organization, 'organization')->where('task_id', $task['id'])->count();
+        // Counting everyone's entries is only for someone who may see them
+        $entries = $context->can('time-entries:view:all')
+            ? TimeEntry::query()->whereBelongsTo($context->organization, 'organization')->where('task_id', $task['id'])->count() : null;
+        $inUse = $entries === null ? ' (SolidTime refuses while time entries use it)'
+            : ($entries > 0 ? " ({$entries} time entries use it, so SolidTime will refuse; mark it done instead)" : '');
 
-        return new PlannedChange('Delete a task'.($entries > 0 ? " ({$entries} time entries use it, so SolidTime will refuse; mark it done instead)" : ''),
+        return new PlannedChange('Delete a task'.$inUse,
             'DELETE', $context->path('tasks/'.$task['id']), [], Present::task($task), null, fn (): array => ['deleted' => $task['id']]);
     }
 }

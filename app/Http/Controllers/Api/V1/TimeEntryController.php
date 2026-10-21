@@ -759,20 +759,27 @@ class TimeEntryController extends Controller
     {
         $member = $this->member($organization);
         /** @var Member|null $newMember */
-        $newMember = $request->has('member_id') ? Member::query()->findOrFail($request->input('member_id')) : null;
-        if ($timeEntry->member_id === $member->getKey() && ($newMember === null || $newMember->getKey() === $member->getKey())) {
+        // A keyed request is validated later, under the row lock; an unknown member then fails validation there
+        $newMember = ! $request->has('member_id') ? null
+            : ($request->hasHeader('Idempotency-Key')
+                ? (Str::isUuid((string) $request->input('member_id')) ? Member::query()->find($request->input('member_id')) : null)
+                : Member::query()->findOrFail($request->input('member_id')));
+        if ($timeEntry->member_id === $member->getKey() && ! $request->has('member_id')
+            || $newMember !== null && $timeEntry->member_id === $member->getKey() && $newMember->getKey() === $member->getKey()) {
             $this->checkPermission($organization, 'time-entries:update:own', $timeEntry);
         } else {
             $this->checkPermission($organization, 'time-entries:update:all', $timeEntry);
         }
 
-        return $idempotency->executeUpdate($request, $organization, $timeEntry, fn (TimeEntry $locked): JsonResource => $this->updateTimeEntry($organization, $locked, $request, $newMember));
+        return $idempotency->executeUpdate($request, $organization, $timeEntry, fn (TimeEntry $locked, array $validated): JsonResource => $this->updateTimeEntry($organization, $locked, $request, $newMember, $validated));
     }
 
     /**
+     * @param  array<string, mixed>  $validated
+     *
      * @throws TimeEntryCanNotBeRestartedApiException|TimeEntryMemberCanNotBeChangedWhileRunningApiException
      */
-    private function updateTimeEntry(Organization $organization, TimeEntry $timeEntry, TimeEntryUpdateRequest $request, ?Member $newMember): JsonResource
+    private function updateTimeEntry(Organization $organization, TimeEntry $timeEntry, TimeEntryUpdateRequest $request, ?Member $newMember, array $validated): JsonResource
     {
         if ($timeEntry->end !== null && $request->has('end') && $request->input('end') === null) {
             throw new TimeEntryCanNotBeRestartedApiException;
@@ -805,7 +812,7 @@ class TimeEntryController extends Controller
         }
 
         $wasBillable = $timeEntry->billable;
-        $timeEntry->fill($request->validated());
+        $timeEntry->fill($validated);
         // Organizations that can not use billable rates can keep or remove the billable flag, but not set it
         if ($timeEntry->billable && ! $wasBillable && ! $this->canUseBillableRates($organization)) {
             $timeEntry->billable = false;
