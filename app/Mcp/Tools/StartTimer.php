@@ -43,10 +43,18 @@ class StartTimer extends WriteTool
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
+        $keyed = isset($input['request_id']);
         $body = $this->newEntryBody($input, $context, $this->utc($input['start'] ?? now()->toIso8601String()), null);
+        if ($keyed && ! isset($input['start'])) {
+            // SolidTime sets the start when it creates the timer, so a retry sends the same body and replays it
+            unset($body['start']);
+        }
         $memberUserId = $context->organization->members()->whereKey($body['member_id'])->value('user_id');
-        $running = is_string($memberUserId) ? $this->runningTimer($context, $memberUserId) : null;
-        $summary = 'Start a timer'.($running !== null ? ' (a timer is already running for this person; it must be stopped first or this will be refused)' : '');
+        // Another member's running timer is checked only for someone who may see everyone's time
+        $mayLook = $memberUserId === $context->user->getKey() || $context->can('time-entries:view:all');
+        $running = is_string($memberUserId) && $mayLook ? $this->runningTimer($context, $memberUserId) : null;
+        $summary = 'Start a timer'.(isset($body['start']) ? '' : ' when the change is confirmed')
+            .($running !== null ? ' (a timer is already running for this person; it must be stopped first or this will be refused)' : '');
 
         return new PlannedChange($summary, 'POST', $context->path('time-entries'), $body, null, $this->entryPreview($body, $context),
             $this->presentEntry($context), $this->idempotencyHeaders($input['request_id'] ?? null));

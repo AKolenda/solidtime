@@ -8,10 +8,6 @@ use App\Enums\TimeEntryAggregationType;
 use App\Mcp\Present;
 use App\Mcp\ToolContext;
 use App\Mcp\Tools\Concerns\FiltersTimeEntries;
-use App\Models\Client;
-use App\Models\Member;
-use App\Models\Project;
-use App\Models\Task;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Response;
@@ -89,15 +85,14 @@ class SummarizeTime extends McpTool
      */
     private function names(?string $type, array $keys, ToolContext $context): array
     {
-        $organizationId = $context->organization->getKey();
-
-        return match ($type) {
-            'project' => Project::query()->where('organization_id', $organizationId)->whereIn('id', $keys)->pluck('name', 'id')->all(),
-            'task' => Task::query()->where('organization_id', $organizationId)->whereIn('id', $keys)->pluck('name', 'id')->all(),
-            'client' => Client::query()->where('organization_id', $organizationId)->whereIn('id', $keys)->pluck('name', 'id')->all(),
-            'user' => Member::query()->where('members.organization_id', $organizationId)->whereIn('members.user_id', $keys)
-                ->join('users', 'users.id', '=', 'members.user_id')->pluck('users.name', 'members.user_id')->all(),
+        $names = match ($type) {
+            'project' => array_map(fn (array $project): string => $project['name'], $context->visibleProjects()),
+            'task' => $context->visibleTaskNames(),
+            'client' => $context->clientNames(),
+            'user' => array_map(fn (array $member): string => $member['name'], $context->memberNames()),
             default => [],
         };
+
+        return array_intersect_key($names, array_flip($keys));
     }
 }

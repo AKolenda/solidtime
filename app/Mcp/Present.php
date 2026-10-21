@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
-use App\Models\Member;
-use App\Models\Project;
-use App\Models\Task;
-
 /** Compact shapes for MCP answers: hours instead of seconds, names beside identifiers. */
 class Present
 {
@@ -57,23 +53,27 @@ class Present
     }
 
     /**
-     * Names of the projects, tasks and members the entries refer to, all within the organization.
-     * Members are keyed by user ID, which is what a time entry carries.
+     * Names of the projects, tasks and members the entries refer to, as far as the user may see
+     * them. Members are keyed by user ID, which is what a time entry carries.
      *
      * @param  array<int, array<string, mixed>>  $entries
      * @return array{projects: array<string, string>, tasks: array<string, string>, members: array<string, array{id: string, name: string}>}
      */
     public static function names(array $entries, ToolContext $context): array
     {
-        $ids = fn (string $key): array => array_values(array_unique(array_filter(array_column($entries, $key), 'is_string')));
-        $organizationId = $context->organization->getKey();
+        $projectIds = array_values(array_unique(array_filter(array_column($entries, 'project_id'), 'is_string')));
+        $projects = array_intersect_key($context->visibleProjects(), array_flip($projectIds));
+        $tasks = [];
+        foreach (array_slice(array_keys($projects), 0, 25) as $projectId) {
+            foreach ($context->visibleTasks($projectId) as $id => $task) {
+                $tasks[$id] = $task['name'];
+            }
+        }
 
         return [
-            'projects' => Project::query()->where('organization_id', $organizationId)->whereIn('id', $ids('project_id'))->pluck('name', 'id')->all(),
-            'tasks' => Task::query()->where('organization_id', $organizationId)->whereIn('id', $ids('task_id'))->pluck('name', 'id')->all(),
-            'members' => Member::query()->where('members.organization_id', $organizationId)->whereIn('members.user_id', $ids('user_id'))
-                ->join('users', 'users.id', '=', 'members.user_id')->get(['members.id', 'members.user_id', 'users.name'])
-                ->mapWithKeys(fn (Member $member): array => [$member->user_id => ['id' => $member->id, 'name' => (string) $member->getAttribute('name')]])->all(),
+            'projects' => array_map(fn (array $project): string => $project['name'], $projects),
+            'tasks' => $tasks,
+            'members' => $context->memberNames(),
         ];
     }
 

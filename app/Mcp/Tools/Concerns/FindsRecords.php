@@ -39,13 +39,13 @@ trait FindsRecords
     }
 
     /**
-     * Through the API, so project visibility applies.
+     * A project from the list the user may see (the show endpoint needs projects:view:all).
      *
      * @return array<string, mixed> ProjectResource array
      */
     protected function findProject(ToolContext $context, string $id): array
     {
-        return $context->api->send('GET', $context->path('projects/'.$id))['data'] ?? [];
+        return $context->visibleProjects()[$id] ?? throw new ToolError('Project not found, or not visible to you.', 404);
     }
 
     /**
@@ -53,19 +53,10 @@ trait FindsRecords
      */
     protected function findTask(ToolContext $context, string $id): array
     {
-        /** @var Task|null $task */
-        $task = Task::query()->whereBelongsTo($context->organization, 'organization')->find($id);
-        if ($task === null) {
-            throw new ToolError('Task not found, or not visible to you.', 404);
-        }
-        try {
-            // Its project must be visible to the user
-            $this->findProject($context, $task->project_id);
-        } catch (ToolError) {
-            throw new ToolError('Task not found, or not visible to you.', 404);
-        }
+        // Only the project is looked up here; the task itself comes from the list the user may see
+        $projectId = Task::query()->whereBelongsTo($context->organization, 'organization')->whereKey($id)->value('project_id');
 
-        return ['id' => $task->id, 'name' => $task->name, 'project_id' => $task->project_id, 'is_done' => $task->is_done,
-            'estimated_time' => $task->estimated_time, 'spent_time' => $task->spent_time];
+        return (is_string($projectId) ? $context->visibleTasks($projectId)[$id] ?? null : null)
+            ?? throw new ToolError('Task not found, or not visible to you.', 404);
     }
 }

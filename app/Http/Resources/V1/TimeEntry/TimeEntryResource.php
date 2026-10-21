@@ -51,4 +51,12 @@ class TimeEntryResource extends BaseResource
             'type' => $this->resource->type->value,
         ];
     }
+
+    /**
+     * Fingerprint of the entry as the API shows it, sent as ETag and checked against If-Match.
+     */
+    public static function etag(TimeEntry $timeEntry): string
+    {
+        return hash('sha256', json_encode((new self($timeEntry))->toArray(request()), JSON_THROW_ON_ERROR));
+    }
 }

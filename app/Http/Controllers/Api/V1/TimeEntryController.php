@@ -641,6 +641,7 @@ class TimeEntryController extends Controller
      * A member can only have one running time entry (an entry with `end` set to `null`). Creating a running entry while another one runs fails with `time_entry_still_running`.
      * To start a new timer, first stop the running entry by updating its `end` to the current time, then create the new entry.
      * To log past work, send both `start` and `end` (UTC). Create one entry per block of work.
+     * With an `Idempotency-Key`, a timer (no `end`) may omit `start` to start when it is created; a retry replays that entry.
      * With an `Idempotency-Key` header (16 to 128 letters, numbers, colons, underscores or hyphens), a retry with the same key and body returns the first response instead of creating another entry.
      *
      * @throws AuthorizationException
@@ -688,7 +689,8 @@ class TimeEntryController extends Controller
         }
 
         // Overlap check for create
-        $start = Carbon::parse($request->input('start'));
+        $start = isset($validated['start']) ? Carbon::parse($validated['start']) : Carbon::now()->startOfSecond();
+        $validated['start'] = $start->format('Y-m-d\TH:i:s\Z');
         $end = $request->input('end') !== null ? Carbon::parse($request->input('end')) : null;
         $this->assertNoOverlap($organization, $member, $start, $end);
 
@@ -724,29 +726,36 @@ class TimeEntryController extends Controller
      * Get time entry
      *
      * Your own time entries need `time-entries:view:own`, those of other members `time-entries:view:all`.
+     * The `ETag` header can be sent back as `If-Match` when updating, so the update is refused if the entry changed in between.
      *
      * @throws AuthorizationException
      *
      * @operationId getTimeEntry
+     *
+     * @response TimeEntryResource
      */
-    public function show(Organization $organization, TimeEntry $timeEntry): JsonResource
+    public function show(Organization $organization, TimeEntry $timeEntry): JsonResponse
     {
         $own = $timeEntry->member_id === $this->member($organization)->getKey();
         $this->checkPermission($organization, $own ? 'time-entries:view:own' : 'time-entries:view:all', $timeEntry);
 
-        return new TimeEntryResource($timeEntry);
+        return (new TimeEntryResource($timeEntry))->response()->header('ETag', '"'.TimeEntryResource::etag($timeEntry).'"');
     }
 
     /**
      * Update time entry
      *
      * To stop a running timer, set `end` to the stop time (UTC). Times the user gives in their own timezone must be converted to UTC first.
+     * With `If-Match` set to the entry's `ETag` (from `GET` or an earlier update), the update is refused with 412 if the entry changed in between.
+     * With an `Idempotency-Key`, a retry with the same key and body returns the first response instead of updating again.
      *
      * @throws AuthorizationException|TimeEntryCanNotBeRestartedApiException|TimeEntryMemberCanNotBeChangedWhileRunningApiException
      *
      * @operationId updateTimeEntry
+     *
+     * @response TimeEntryResource
      */
-    public function update(Organization $organization, TimeEntry $timeEntry, TimeEntryUpdateRequest $request): JsonResource
+    public function update(Organization $organization, TimeEntry $timeEntry, TimeEntryUpdateRequest $request, ApiCreationIdempotency $idempotency): JsonResource|JsonResponse
     {
         $member = $this->member($organization);
         /** @var Member|null $newMember */
@@ -757,6 +766,14 @@ class TimeEntryController extends Controller
             $this->checkPermission($organization, 'time-entries:update:all', $timeEntry);
         }
 
+        return $idempotency->executeUpdate($request, $organization, $timeEntry, fn (TimeEntry $locked): JsonResource => $this->updateTimeEntry($organization, $locked, $request, $newMember));
+    }
+
+    /**
+     * @throws TimeEntryCanNotBeRestartedApiException|TimeEntryMemberCanNotBeChangedWhileRunningApiException
+     */
+    private function updateTimeEntry(Organization $organization, TimeEntry $timeEntry, TimeEntryUpdateRequest $request, ?Member $newMember): JsonResource
+    {
         if ($timeEntry->end !== null && $request->has('end') && $request->input('end') === null) {
             throw new TimeEntryCanNotBeRestartedApiException;
         }
@@ -805,17 +822,18 @@ class TimeEntryController extends Controller
         $timeEntry->setComputedAttributeValue('billable_rate');
         $timeEntry->save();
 
+        // A guarded update runs inside a transaction; the recalculation must see the committed entry
         if ($oldProject !== null) {
-            RecalculateSpentTimeForProject::dispatch($oldProject);
+            RecalculateSpentTimeForProject::dispatch($oldProject)->afterCommit();
         }
         if ($oldTask !== null) {
-            RecalculateSpentTimeForTask::dispatch($oldTask);
+            RecalculateSpentTimeForTask::dispatch($oldTask)->afterCommit();
         }
         if ($project !== null && ($oldProject === null || $project->isNot($oldProject))) {
-            RecalculateSpentTimeForProject::dispatch($project);
+            RecalculateSpentTimeForProject::dispatch($project)->afterCommit();
         }
         if ($task !== null && ($oldTask === null || $task->isNot($oldTask))) {
-            RecalculateSpentTimeForTask::dispatch($task);
+            RecalculateSpentTimeForTask::dispatch($task)->afterCommit();
         }
 
         return new TimeEntryResource($timeEntry);

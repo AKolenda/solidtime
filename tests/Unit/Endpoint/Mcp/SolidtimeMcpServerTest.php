@@ -124,7 +124,7 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
     {
         $data = $this->createUserWithRole(Role::Employee);
         $other = $this->teammate($data->organization);
-        $project = Project::factory()->forOrganization($data->organization)->create(['name' => 'Job 4410']);
+        $project = Project::factory()->forOrganization($data->organization)->isPublic()->create(['name' => 'Job 4410']);
         TimeEntry::factory()->forMember($data->member)->forProject($project)->startWithDuration(Carbon::parse('2026-10-01 08:00:00'), 5400)->create(['description' => 'Turning']);
         TimeEntry::factory()->forMember($other->member)->startWithDuration(Carbon::parse('2026-10-01 08:00:00'), 3600)->create();
         Passport::actingAs($data->user);
@@ -356,5 +356,51 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
             ->assertStatus(400)->assertJsonPath('error', 'invalid_redirect_uri');
         $this->postJson('/oauth/register', ['client_name' => 'Claude Code', 'redirect_uris' => ['http://localhost:4567/callback']])
             ->assertCreated()->assertJsonPath('scope', 'mcp:use');
+    }
+
+    public function test_previews_do_not_name_projects_the_user_cannot_see(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $secret = Project::factory()->forOrganization($data->organization)->isPrivate()->create(['name' => 'Secret job 9001']);
+        $task = Task::factory()->forProject($secret)->forOrganization($data->organization)->create(['name' => 'Secret op']);
+        Passport::actingAs($data->user);
+
+        $response = $this->callTool('create_time_entry', ['project_id' => $secret->id, 'task_id' => $task->id, 'start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T09:00:00Z']);
+        $this->assertStringNotContainsString('Secret', (string) $response->getContent());
+        $this->assertStringContainsString('not visible', $this->error('update_task', ['task_id' => $task->id, 'name' => 'x']));
+        $this->assertStringContainsString('not visible', $this->error('get_project', ['project_id' => $secret->id]));
+        $this->error('create_time_entry', ['project_id' => $secret->id, 'start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T09:00:00Z', 'confirm' => true]);
+        $this->assertSame(0, TimeEntry::query()->count());
+    }
+
+    public function test_employees_who_may_manage_tasks_can_use_the_task_tools(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $data->organization->update(['employees_can_manage_tasks' => true]);
+        $project = Project::factory()->forOrganization($data->organization)->isPublic()->create(['name' => 'Job 7781']);
+        Passport::actingAs($data->user);
+
+        $this->assertSame('Job 7781', $this->ok('get_project', ['project_id' => $project->id])['project']['name']);
+        $task = $this->ok('create_task', ['project_id' => $project->id, 'name' => 'Turning', 'confirm' => true])['result'];
+        $this->ok('update_task', ['task_id' => $task['id'], 'name' => 'Turning OP10', 'confirm' => true]);
+        $this->assertSame('Turning OP10', Task::query()->findOrFail($task['id'])->name);
+        $this->ok('delete_task', ['task_id' => $task['id'], 'confirm' => true]);
+        $this->assertSame(0, Task::query()->count());
+    }
+
+    public function test_start_timer_retry_with_request_id_replays_across_time(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        Passport::actingAs($data->user);
+        $arguments = ['description' => 'Setup', 'request_id' => 'chat-run-000000000001', 'confirm' => true];
+
+        $this->travelTo(Carbon::parse('2026-10-21 14:00:00'));
+        $first = $this->ok('start_timer', $arguments)['result'];
+        $this->travelTo(Carbon::parse('2026-10-21 14:03:20'));
+        $retry = $this->ok('start_timer', $arguments)['result'];
+
+        $this->assertSame($first['id'], $retry['id']);
+        $this->assertSame('2026-10-21T14:00:00Z', $retry['start']);
+        $this->assertSame(1, TimeEntry::query()->count());
     }
 }

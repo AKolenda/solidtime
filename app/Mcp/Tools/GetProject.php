@@ -6,6 +6,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Present;
 use App\Mcp\ToolContext;
+use App\Mcp\ToolError;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
@@ -35,12 +36,12 @@ class GetProject extends McpTool
 
     protected function run(array $input, ToolContext $context): Response
     {
-        $project = $context->api->send('GET', $context->path('projects/'.$input['project_id']))['data'] ?? [];
-        $tasks = $context->api->all($context->path('tasks'), ['project_id' => $input['project_id'], 'done' => 'all']);
+        $project = $context->visibleProjects()[$input['project_id']] ?? throw new ToolError('Project not found, or not visible to you.', 404);
+        $tasks = array_values($context->visibleTasks($input['project_id']));
         $byMember = null;
         if ($context->can('time-entries:view:all')) {
             $aggregate = $context->api->send('GET', $context->path('time-entries/aggregate'), ['group' => 'user', 'project_ids' => [$input['project_id']]])['data'] ?? [];
-            $names = Present::names(array_map(fn (array $group): array => ['user_id' => $group['key'] ?? null], $aggregate['grouped_data'] ?? []), $context)['members'];
+            $names = $context->memberNames();
             $byMember = array_map(fn (array $group): array => [
                 'member_id' => $names[$group['key'] ?? '']['id'] ?? null,
                 'member' => $names[$group['key'] ?? '']['name'] ?? null,

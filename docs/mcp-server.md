@@ -98,8 +98,19 @@ pruned after `MCP_AUDIT_RETENTION_DAYS` (default 180) by the daily
 - `POST /v1/organizations/{organization}/idempotent-time-entries` requires an
   `Idempotency-Key`. A plain `POST .../time-entries` with the header behaves
   the same way: a retry with the same key and body replays the first
-  response, and a different body answers 409. This is the existing
-  project and task mechanism (`ApiCreationIdempotency`).
+  response. This is the project and task mechanism
+  (`ApiCreationIdempotency`).
+- With a key, a timer (`end` null) may leave out `start`. It then starts when
+  it is created, and a retry sends the same body, so it replays that timer.
+- A key reused with another body answers 409 with
+  `X-Solidtime-Idempotency: mismatch`. Keys are unique per change, so this
+  means the key's first request already succeeded.
 - `GET /v1/organizations/{organization}/time-entries/{timeEntry}` returns one
-  entry. Your own entries need `time-entries:view:own`; other members' entries
-  need `time-entries:view:all`.
+  entry with an `ETag`:
+  - your own entries need `time-entries:view:own`;
+  - other members' entries need `time-entries:view:all`.
+- `PUT .../time-entries/{timeEntry}` accepts the same headers, applied under a
+  row lock:
+  - `If-Match: <ETag>` refuses the update with 412 if the entry changed after
+    it was read, rather than overwriting someone else's change;
+  - `Idempotency-Key` replays the first response on retry.

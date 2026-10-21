@@ -86,8 +86,9 @@ class TimeEntryStoreRequest extends BaseFormRequest
                 })->uuid()->withMessage(__('validation.task_belongs_to_project')),
             ],
             // Start of time entry (Format: "Y-m-d\TH:i:s\Z", UTC timezone, Example: "2000-02-22T14:58:59Z")
+            // A keyed timer (no end) may leave it out to start when it is created; a retry then replays that start
             'start' => [
-                'required',
+                $this->hasHeader('Idempotency-Key') && $this->input('end') === null ? 'nullable' : 'required',
                 'date_format:Y-m-d\TH:i:s\Z',
             ],
             // End of time entry (Format: "Y-m-d\TH:i:s\Z", UTC timezone, Example: "2000-02-22T14:58:59Z")

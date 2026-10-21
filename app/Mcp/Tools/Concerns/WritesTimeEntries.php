@@ -6,7 +6,6 @@ namespace App\Mcp\Tools\Concerns;
 
 use App\Mcp\Present;
 use App\Mcp\ToolContext;
-use App\Models\Project;
 use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
@@ -53,8 +52,7 @@ trait WritesTimeEntries
     protected function newEntryBody(array $input, ToolContext $context, string $start, ?string $end): array
     {
         $projectId = $input['project_id'] ?? null;
-        $billable = $input['billable'] ?? ($projectId === null ? false
-            : (bool) Project::query()->whereBelongsTo($context->organization, 'organization')->whereKey($projectId)->value('is_billable'));
+        $billable = $input['billable'] ?? (bool) ($context->visibleProjects()[$projectId ?? '']['is_billable'] ?? false);
 
         return [
             'member_id' => $input['member_id'] ?? $context->member->getKey(),
