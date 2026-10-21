@@ -63,6 +63,11 @@ class TimeEntryUpdateRequest extends BaseFormRequest
         return [
             // ID of the organization member that the time entry should belong to
             'member_id' => [
+                // Present means a member: an empty value is refused, not skipped, and a non-string is
+                // refused before the lookup runs
+                'bail',
+                'sometimes',
+                'required',
                 'string',
                 ExistsEloquent::make(Member::class, null, function (Builder $builder): Builder {
                     /** @var Builder<Member> $builder */

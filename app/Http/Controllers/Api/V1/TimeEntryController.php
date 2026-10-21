@@ -762,7 +762,7 @@ class TimeEntryController extends Controller
         // A keyed request is validated later, under the row lock; an unknown member then fails validation there
         $newMember = ! $request->has('member_id') ? null
             : ($request->hasHeader('Idempotency-Key')
-                ? (Str::isUuid((string) $request->input('member_id')) ? Member::query()->find($request->input('member_id')) : null)
+                ? (is_string($request->input('member_id')) && Str::isUuid($request->input('member_id')) ? Member::query()->find($request->input('member_id')) : null)
                 : Member::query()->findOrFail($request->input('member_id')));
         if ($timeEntry->member_id === $member->getKey() && ! $request->has('member_id')
             || $newMember !== null && $timeEntry->member_id === $member->getKey() && $newMember->getKey() === $member->getKey()) {

@@ -114,4 +114,18 @@ class TimeEntryGuardedUpdateEndpointTest extends ApiEndpointTestAbstract
         $this->assertDatabaseCount('api_creation_operations', 0);
         $this->assertNull($entry->refresh()->end);
     }
+
+    public function test_keyed_update_with_a_malformed_member_is_a_validation_error(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:view:all', 'time-entries:update:all']);
+        $entry = $this->entry($data);
+        Passport::actingAs($data->user);
+        $url = route('api.v1.time-entries.update', [$data->organization->id, $entry->id]);
+
+        foreach ([[], ['id' => 'x'], 12, 'not-a-member'] as $index => $memberId) {
+            $this->putJson($url, ['member_id' => $memberId], ['Idempotency-Key' => 'erp-member-000000000'.$index])->assertJsonValidationErrorFor('member_id');
+        }
+        $this->assertDatabaseCount('api_creation_operations', 0);
+        $this->putJson($url, ['member_id' => ['id' => 'x']])->assertJsonValidationErrorFor('member_id');
+    }
 }
