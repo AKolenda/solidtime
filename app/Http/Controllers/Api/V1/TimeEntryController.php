@@ -29,6 +29,7 @@ use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TimeEntry;
+use App\Service\ApiCreationIdempotency;
 use App\Service\BillableRateService;
 use App\Service\LocalizationService;
 use App\Service\ReportExport\TimeEntriesDetailedCsvExport;
@@ -640,14 +641,20 @@ class TimeEntryController extends Controller
      * A member can only have one running time entry (an entry with `end` set to `null`). Creating a running entry while another one runs fails with `time_entry_still_running`.
      * To start a new timer, first stop the running entry by updating its `end` to the current time, then create the new entry.
      * To log past work, send both `start` and `end` (UTC). Create one entry per block of work.
+     * With an `Idempotency-Key` header (16 to 128 letters, numbers, colons, underscores or hyphens), a retry with the same key and body returns the first response instead of creating another entry.
      *
      * @throws AuthorizationException
      * @throws TimeEntryStillRunningApiException
      *
      * @operationId createTimeEntry
+     *
+     * @response TimeEntryResource
      */
-    public function store(Organization $organization, TimeEntryStoreRequest $request): JsonResource
+    public function store(Organization $organization, TimeEntryStoreRequest $request, ApiCreationIdempotency $idempotency): JsonResource|JsonResponse
     {
+        if ($request->hasHeader('Idempotency-Key')) {
+            $request->validateMemberId();
+        }
         /** @var Member $member */
         $member = Member::query()->findOrFail($request->input('member_id'));
         if ($member->getKey() === $this->member($organization)->getKey()) {
@@ -661,16 +668,19 @@ class TimeEntryController extends Controller
         $lock?->block(5);
 
         try {
-            return $this->storeTimeEntry($organization, $member, $request);
+            // With an Idempotency-Key, a retried creation replays the first response instead of creating another entry
+            return $idempotency->execute($request, $organization, 'time-entries', fn (array $validated): JsonResource => $this->storeTimeEntry($organization, $member, $request, $validated));
         } finally {
             $lock?->release();
         }
     }
 
     /**
+     * @param  array<string, mixed>  $validated
+     *
      * @throws TimeEntryStillRunningApiException
      */
-    private function storeTimeEntry(Organization $organization, Member $member, TimeEntryStoreRequest $request): JsonResource
+    private function storeTimeEntry(Organization $organization, Member $member, TimeEntryStoreRequest $request, array $validated): JsonResource
     {
         // A user can only have one running time entry, across all organizations
         if ($request->input('end') === null && TimeEntry::query()->where('user_id', $member->user_id)->whereNull('end')->exists()) {
@@ -687,7 +697,7 @@ class TimeEntryController extends Controller
         $task = $request->input('task_id') !== null ? $project->tasks()->findOrFail((string) $request->input('task_id')) : null;
 
         $timeEntry = new TimeEntry;
-        $timeEntry->fill($request->validated());
+        $timeEntry->fill($validated);
         // Organizations that can not use billable rates can not create billable time entries
         if ($timeEntry->billable && ! $this->canUseBillableRates($organization)) {
             $timeEntry->billable = false;
@@ -699,12 +709,30 @@ class TimeEntryController extends Controller
         $timeEntry->setComputedAttributeValue('billable_rate');
         $timeEntry->save();
 
+        // A keyed creation runs inside a transaction; the recalculation must see the committed entry
         if ($project !== null) {
-            RecalculateSpentTimeForProject::dispatch($project);
+            RecalculateSpentTimeForProject::dispatch($project)->afterCommit();
         }
         if ($task !== null) {
-            RecalculateSpentTimeForTask::dispatch($task);
+            RecalculateSpentTimeForTask::dispatch($task)->afterCommit();
         }
+
+        return new TimeEntryResource($timeEntry);
+    }
+
+    /**
+     * Get time entry
+     *
+     * Your own time entries need `time-entries:view:own`, those of other members `time-entries:view:all`.
+     *
+     * @throws AuthorizationException
+     *
+     * @operationId getTimeEntry
+     */
+    public function show(Organization $organization, TimeEntry $timeEntry): JsonResource
+    {
+        $own = $timeEntry->member_id === $this->member($organization)->getKey();
+        $this->checkPermission($organization, $own ? 'time-entries:view:own' : 'time-entries:view:all', $timeEntry);
 
         return new TimeEntryResource($timeEntry);
     }

@@ -1,0 +1,105 @@
+# MCP server
+
+SolidTime answers MCP clients (Claude, ChatGPT, Codex and others that speak
+remote MCP) at `POST /mcp`: Streamable HTTP, stateless JSON, built on
+[`laravel/mcp`](https://github.com/laravel/mcp). It is for the internal
+network only.
+
+## Access
+
+- **Who**: every call needs a Passport bearer token (`auth:api`) of a
+  verified user. Tools act as that user, with that user's role in the
+  organization. Each tool sends its work through the regular `/api/v1` routes
+  (`App\Mcp\InternalApi`), so permissions, validation, overlap checks and
+  idempotency are exactly the API's.
+- **Connecting**:
+  - A personal API token (profile page) works as a bearer header.
+  - OAuth clients register themselves at `POST /oauth/register`, then use
+    Passport's consent screen and token endpoint. Discovery is at
+    `/.well-known/oauth-protected-resource` and
+    `/.well-known/oauth-authorization-server`.
+  - Registered redirect URIs must be on `MCP_REDIRECT_DOMAINS`
+    (default `http://localhost,http://127.0.0.1`).
+- **Where**: `/mcp` and the OAuth registration and discovery routes answer 404
+  in two cases:
+  - the client address is outside `MCP_ALLOWED_NETWORKS` (default loopback
+    and private ranges);
+  - the request came through Cloudflare (`Cf-Ray` or `Cf-Connecting-Ip`).
+
+  Keep `TRUSTED_PROXIES` accurate so the client address is the real one. Do
+  not publish `/mcp` through a tunnel.
+- **Off switch**: `MCP_ENABLED=false`.
+
+## Tools
+
+| Tool | Change |
+| --- | --- |
+| `get_context` | no |
+| `list_time_entries` | no |
+| `summarize_time` | no |
+| `list_active_timers` | no |
+| `list_projects` | no |
+| `get_project` | no |
+| `list_tasks` | no |
+| `list_clients` | no |
+| `list_members` | no |
+| `list_tags` | no |
+| `start_timer` | yes |
+| `stop_timer` | yes |
+| `create_time_entry` | yes |
+| `update_time_entry` | yes |
+| `delete_time_entry` | yes, destructive |
+| `create_project` | yes |
+| `update_project` | yes |
+| `delete_project` | yes, destructive |
+| `create_task` | yes |
+| `update_task` | yes |
+| `delete_task` | yes, destructive |
+
+Read tools carry `readOnlyHint`. Creations, `start_timer` and `stop_timer`
+carry `destructiveHint: false`. Updates and deletes keep MCP's default of
+destructive. Stop and update tools carry `idempotentHint`.
+
+**A change is two calls.**
+
+1. Without `confirm`, a change tool answers with a preview (`summary`,
+   `before`, `after`) and changes nothing.
+2. Only the same call with `confirm: true` (the boolean) makes the change. The
+   AI may set it only after the user approved that preview.
+
+Creations accept an optional `request_id`. It is sent as the API's
+`Idempotency-Key`, so a retried call returns the first result.
+
+**Every call checks its arguments.**
+
+- Unknown arguments are refused.
+- The rest are validated before anything runs.
+
+**Every call is logged** in `mcp_tool_calls`:
+
+- who, which OAuth client and token, and which tool;
+- the outcome (`ok`, `preview`, `error`, `denied` or `rate_limited`), the
+  error and the duration;
+- the arguments, redacted: identifiers, numbers, dates and settings are kept,
+  and other text is stored as its length.
+
+The row is written before the tool runs, so no change goes unlogged. Rows are
+pruned after `MCP_AUDIT_RETENTION_DAYS` (default 180) by the daily
+`model:prune`.
+
+**Rate limits**, per user per minute:
+
+- `MCP_READ_CALLS_PER_MINUTE`: read tool calls (default 120);
+- `MCP_WRITE_CALLS_PER_MINUTE`: change tool calls (default 30);
+- all MCP messages: 240.
+
+## API additions used by MCP and the ERP
+
+- `POST /v1/organizations/{organization}/idempotent-time-entries` requires an
+  `Idempotency-Key`. A plain `POST .../time-entries` with the header behaves
+  the same way: a retry with the same key and body replays the first
+  response, and a different body answers 409. This is the existing
+  project and task mechanism (`ApiCreationIdempotency`).
+- `GET /v1/organizations/{organization}/time-entries/{timeEntry}` returns one
+  entry. Your own entries need `time-entries:view:own`; other members' entries
+  need `time-entries:view:all`.

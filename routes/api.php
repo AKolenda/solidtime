@@ -116,7 +116,9 @@ Route::prefix('v1')->name('v1.')->group(static function (): void {
             Route::get('/time-entries/export', [TimeEntryController::class, 'indexExport'])->name('index-export');
             Route::get('/time-entries/aggregate', [TimeEntryController::class, 'aggregate'])->name('aggregate');
             Route::get('/time-entries/aggregate/export', [TimeEntryController::class, 'aggregateExport'])->name('aggregate-export');
+            Route::get('/time-entries/{timeEntry}', [TimeEntryController::class, 'show'])->name('show');
             Route::post('/time-entries', [TimeEntryController::class, 'store'])->name('store')->middleware('check-organization-blocked');
+            Route::post('/idempotent-time-entries', [TimeEntryController::class, 'store'])->name('store-idempotent')->middleware(['check-organization-blocked', RequireCreationIdempotencyKey::class]);
             Route::put('/time-entries/{timeEntry}', [TimeEntryController::class, 'update'])->name('update')->middleware('check-organization-blocked');
             Route::patch('/time-entries', [TimeEntryController::class, 'updateMultiple'])->name('update-multiple')->middleware('check-organization-blocked');
             Route::delete('/time-entries/{timeEntry}', [TimeEntryController::class, 'destroy'])->name('destroy');

@@ -6,6 +6,7 @@ namespace App\Service;
 
 use App\Http\Requests\V1\Project\ProjectStoreRequest;
 use App\Http\Requests\V1\Task\TaskStoreRequest;
+use App\Http\Requests\V1\TimeEntry\TimeEntryStoreRequest;
 use App\Models\Organization;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -17,11 +18,14 @@ use Illuminate\Validation\ValidationException;
 /** Durable replay for creations whose authorization has already been checked. */
 class ApiCreationIdempotency
 {
-    public function execute(ProjectStoreRequest|TaskStoreRequest $request, Organization $organization, string $resource, Closure $create): JsonResource|JsonResponse
+    /**
+     * @param  Closure(array<string, mixed>): JsonResource  $create  receives the validated input
+     */
+    public function execute(ProjectStoreRequest|TaskStoreRequest|TimeEntryStoreRequest $request, Organization $organization, string $resource, Closure $create): JsonResource|JsonResponse
     {
         $key = $request->header('Idempotency-Key');
         if ($key === null) {
-            return $create();
+            return $create($request->validated());
         }
         if (! preg_match('/\A[A-Za-z0-9:_-]{16,128}\z/', $key)) {
             throw ValidationException::withMessages(['Idempotency-Key' => 'Use 16 to 128 letters, numbers, colons, underscores or hyphens.']);
@@ -42,8 +46,8 @@ class ApiCreationIdempotency
                     ->header('X-Solidtime-Idempotency', 'v1');
             }
 
-            Validator::make($request->all(), $request->creationRules())->validate();
-            $response = $create()->response();
+            $validated = Validator::make($request->all(), $request->creationRules())->validate();
+            $response = $create($validated)->response();
             DB::table('api_creation_operations')->insert([
                 'scope_key' => $scope,
                 'organization_id' => $organization->id,

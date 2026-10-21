@@ -1,0 +1,72 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Mcp\Tools;
+
+use App\Mcp\PlannedChange;
+use App\Mcp\ToolContext;
+use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Laravel\Mcp\Response;
+
+/**
+ * A change answers with a preview of exactly what it will do. It is made only when the
+ * same call carries confirm: true, which the AI may set only after the user approved it.
+ */
+abstract class WriteTool extends McpTool
+{
+    protected bool $writes = true;
+
+    /**
+     * Tool-specific arguments, without confirm.
+     *
+     * @return array<string, mixed>
+     */
+    abstract protected function changeArguments(JsonSchema $schema): array;
+
+    /**
+     * Work out the exact change, reading the current state where there is one.
+     *
+     * @param  array<string, mixed>  $input
+     */
+    abstract protected function plan(array $input, ToolContext $context): PlannedChange;
+
+    protected function arguments(JsonSchema $schema): array
+    {
+        return [
+            ...$this->changeArguments($schema),
+            'confirm' => $schema->boolean()->description('Leave unset to get a preview; nothing changes. Set to true only after the user has seen that preview and explicitly approved this exact change in the conversation. Never set it on your own initiative.'),
+        ];
+    }
+
+    protected function commonRules(): array
+    {
+        // Any value is accepted here and checked strictly in run()
+        return [...parent::commonRules(), 'confirm' => ['sometimes']];
+    }
+
+    protected function run(array $input, ToolContext $context): Response
+    {
+        $change = $this->plan($input, $context);
+        // Strictly the boolean true: a string or a number is not an approval
+        if (($input['confirm'] ?? null) !== true) {
+            $this->previewed = true;
+
+            return Response::json([
+                'preview' => true,
+                'summary' => $change->summary,
+                'before' => $change->before,
+                'after' => $change->after,
+                'next_step' => 'Nothing has changed. Show the user this change. Only if they approve it, call '.$this->name().' again with the same arguments plus confirm: true.',
+            ]);
+        }
+
+        $body = $context->api->send($change->method, $change->path, $change->body, $change->headers);
+
+        return Response::json([
+            'applied' => true,
+            'summary' => $change->summary,
+            'result' => ($change->present)($body['data'] ?? null),
+        ]);
+    }
+}

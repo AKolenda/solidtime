@@ -16,6 +16,7 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Korridor\LaravelModelValidationRules\Rules\ExistsEloquent;
 
@@ -30,6 +31,15 @@ class TimeEntryStoreRequest extends BaseFormRequest
      * @return array<string, array<string|Closure|ValidationRule|\Illuminate\Contracts\Validation\Rule>>
      */
     public function rules(): array
+    {
+        // Keyed creation validates inside its transaction, after replay lookup.
+        return $this->hasHeader('Idempotency-Key') ? [] : $this->creationRules();
+    }
+
+    /**
+     * @return array<string, array<string|Closure|ValidationRule|\Illuminate\Contracts\Validation\Rule>>
+     */
+    public function creationRules(): array
     {
         return [
             // ID of the organization member that the time entry should belong to (a member ID from GET /v1/users/me/memberships or the members list, not a user ID)
@@ -120,5 +130,15 @@ class TimeEntryStoreRequest extends BaseFormRequest
                 })->uuid(),
             ],
         ];
+    }
+
+    /**
+     * Keyed creation skips the request validation, but the member is needed for the permission check before the creation runs
+     */
+    public function validateMemberId(): void
+    {
+        Validator::make($this->all(), [
+            'member_id' => $this->creationRules()['member_id'],
+        ])->validate();
     }
 }

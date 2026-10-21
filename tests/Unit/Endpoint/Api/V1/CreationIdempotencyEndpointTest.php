@@ -130,4 +130,62 @@ class CreationIdempotencyEndpointTest extends ApiEndpointTestAbstract
         $this->postJson($url, $this->payload())->assertCreated()->assertHeaderMissing('X-Solidtime-Idempotency');
         $this->assertDatabaseCount('api_creation_operations', 0);
     }
+
+    public function test_time_entry_replays_and_creates_only_one_entry(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:create:own']);
+        Passport::actingAs($data->user);
+        $project = Project::factory()->forOrganization($data->organization)->create(['is_public' => true]);
+        $url = route('api.v1.time-entries.store-idempotent', [$data->organization->id]);
+        $payload = ['member_id' => $data->member->id, 'project_id' => $project->id, 'start' => '2026-10-01T08:00:00Z', 'end' => '2026-10-01T10:00:00Z', 'billable' => false, 'description' => 'Turning'];
+        $this->postJson($url, $payload)->assertUnprocessable();
+        $first = $this->postJson($url, $payload, $this->headers)->assertCreated();
+        $retry = $this->postJson($url, array_reverse($payload, true), $this->headers)->assertCreated()->assertHeader('X-Solidtime-Idempotency', 'v1');
+        $this->assertSame($first->json(), $retry->json());
+        $this->assertSame('Turning', $first->json('data.description'));
+        $this->assertSame($project->id, $first->json('data.project_id'));
+        $this->assertDatabaseCount('time_entries', 1);
+        $this->postJson($url, [...$payload, 'description' => 'Milling'], $this->headers)->assertConflict();
+        $this->assertDatabaseCount('time_entries', 1);
+    }
+
+    public function test_running_time_entry_replay_returns_the_same_timer(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:create:own']);
+        Passport::actingAs($data->user);
+        $url = route('api.v1.time-entries.store', [$data->organization->id]);
+        $payload = ['member_id' => $data->member->id, 'start' => '2026-10-01T08:00:00Z', 'end' => null, 'billable' => false];
+        $first = $this->postJson($url, $payload, $this->headers)->assertCreated();
+        $this->assertSame($first->json(), $this->postJson($url, $payload, $this->headers)->assertCreated()->json());
+        // Another key is another creation, refused while the first timer runs
+        $this->postJson($url, $payload, ['Idempotency-Key' => 'calendar-project-0002'])->assertStatus(400);
+        $this->assertDatabaseCount('time_entries', 1);
+    }
+
+    public function test_time_entry_replay_rechecks_permission_and_validates_member(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:create:own']);
+        Passport::actingAs($data->user);
+        $url = route('api.v1.time-entries.store', [$data->organization->id]);
+        $payload = ['member_id' => $data->member->id, 'start' => '2026-10-01T08:00:00Z', 'end' => '2026-10-01T09:00:00Z', 'billable' => false];
+        $this->postJson($url, ['member_id' => 'not-a-member', 'start' => '2026-10-01T08:00:00Z'], $this->headers)->assertUnprocessable();
+        $this->postJson($url, [...$payload, 'member_id' => $data->ownerMember->id], $this->headers)->assertForbidden();
+        $this->postJson($url, $payload, $this->headers)->assertCreated();
+        PermissionStore::registerCustomRole($data->member->role, []);
+        app(PermissionStore::class)->clear();
+        $this->postJson($url, $payload, $this->headers)->assertForbidden();
+        $this->assertDatabaseCount('time_entries', 1);
+    }
+
+    public function test_unkeyed_time_entry_creation_is_unchanged(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:create:own']);
+        Passport::actingAs($data->user);
+        $url = route('api.v1.time-entries.store', [$data->organization->id]);
+        $payload = ['member_id' => $data->member->id, 'start' => '2026-10-01T08:00:00Z', 'end' => '2026-10-01T09:00:00Z', 'billable' => false];
+        $this->postJson($url, $payload)->assertCreated()->assertHeaderMissing('X-Solidtime-Idempotency');
+        $this->postJson($url, [...$payload, 'start' => '2026-10-01T10:00:00Z', 'end' => '2026-10-01T11:00:00Z'])->assertCreated();
+        $this->assertDatabaseCount('time_entries', 2);
+        $this->assertDatabaseCount('api_creation_operations', 0);
+    }
 }
