@@ -69,7 +69,7 @@ destructive. Stop and update tools carry `idempotentHint`.
    AI may set it only after the user approved that preview.
 
 The preview's `confirm_with` lists what the confirming call must add. For
-`update_time_entry` and `stop_timer` that is the entry's `expected_version`,
+`update_time_entry`, `stop_timer` and `delete_time_entry` that is the entry's `expected_version`,
 and for a `stop_timer` without `time_entry_id` also the timer it found. So a
 confirmation changes only the state the user saw, and an entry changed since
 the preview is refused (412).
@@ -125,3 +125,5 @@ pruned after `MCP_AUDIT_RETENTION_DAYS` (default 180) by the daily
   - `If-Match: <ETag>` refuses the update with 412 if the entry changed after
     it was read, rather than overwriting someone else's change;
   - `Idempotency-Key` replays the first response on retry.
+- `DELETE .../time-entries/{timeEntry}` accepts `If-Match` the same way, so a
+  deletion is refused (412) if the entry changed after it was read.

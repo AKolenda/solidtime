@@ -64,7 +64,8 @@ class UpdateTimeEntry extends WriteTool
                 $body[$key] = $this->utc($input[$key]);
             }
         }
-        if (array_key_exists('project_id', $body) && $body['project_id'] === null && ! array_key_exists('task_id', $body)) {
+        // A task belongs to its project: moving to another project without a task clears it, as the API does
+        if (array_key_exists('project_id', $body) && $body['project_id'] !== ($entry['project_id'] ?? null) && ! array_key_exists('task_id', $body)) {
             $body['task_id'] = null;
         }
         if ($body === []) {

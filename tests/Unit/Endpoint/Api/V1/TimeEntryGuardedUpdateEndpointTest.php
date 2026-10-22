@@ -128,4 +128,20 @@ class TimeEntryGuardedUpdateEndpointTest extends ApiEndpointTestAbstract
         $this->assertDatabaseCount('api_creation_operations', 0);
         $this->putJson($url, ['member_id' => ['id' => 'x']])->assertJsonValidationErrorFor('member_id');
     }
+
+    public function test_if_match_guards_deletion(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:view:own', 'time-entries:delete:own']);
+        $entry = $this->entry($data);
+        Passport::actingAs($data->user);
+        $etag = $this->getJson(route('api.v1.time-entries.show', [$data->organization->id, $entry->id]))->assertOk()->headers->get('ETag');
+        $url = route('api.v1.time-entries.destroy', [$data->organization->id, $entry->id]);
+
+        $entry->update(['description' => 'Edited meanwhile']);
+        $this->deleteJson($url, [], ['If-Match' => $etag])->assertStatus(412);
+        $this->assertDatabaseCount('time_entries', 1);
+        $fresh = $this->getJson(route('api.v1.time-entries.show', [$data->organization->id, $entry->id]))->headers->get('ETag');
+        $this->deleteJson($url, [], ['If-Match' => $fresh])->assertNoContent();
+        $this->assertDatabaseCount('time_entries', 0);
+    }
 }

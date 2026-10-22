@@ -304,9 +304,9 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'description' => 'Deburr', 'end' => '2026-10-20T10:00:00Z', ...$preview['confirm_with']]);
         $this->assertSame('Deburr', $entry->refresh()->description);
 
-        $this->ok('delete_time_entry', ['time_entry_id' => $entry->id]);
+        $deletion = $this->ok('delete_time_entry', ['time_entry_id' => $entry->id]);
         $this->assertSame(1, TimeEntry::query()->count());
-        $this->ok('delete_time_entry', ['time_entry_id' => $entry->id, 'confirm' => true]);
+        $this->ok('delete_time_entry', ['time_entry_id' => $entry->id, ...$deletion['confirm_with']]);
         $this->assertSame(0, TimeEntry::query()->count());
     }
 
@@ -627,5 +627,32 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $employee = $this->teammate($data->organization);
         Passport::actingAs($employee->user);
         $this->assertStringContainsString('permission', $this->error('list_members'));
+    }
+
+    public function test_a_deletion_is_refused_once_the_entry_changed_after_the_preview(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $entry = TimeEntry::factory()->forMember($data->member)->startWithDuration(Carbon::parse('2026-10-20 08:00:00'), 3600)->create(['description' => 'Turning']);
+        Passport::actingAs($data->user);
+
+        $preview = $this->ok('delete_time_entry', ['time_entry_id' => $entry->id]);
+        $this->assertStringContainsString('expected_version', $this->error('delete_time_entry', ['time_entry_id' => $entry->id, 'confirm' => true]));
+        $entry->update(['description' => 'Edited meanwhile']);
+        $this->assertStringContainsString('changed', $this->error('delete_time_entry', ['time_entry_id' => $entry->id, ...$preview['confirm_with']]));
+        $this->assertSame(1, TimeEntry::query()->count());
+    }
+
+    public function test_moving_to_another_project_shows_the_task_cleared(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        [$from, $to] = Project::factory()->forOrganization($data->organization)->count(2)->create();
+        $task = Task::factory()->forProject($from)->forOrganization($data->organization)->create();
+        $entry = TimeEntry::factory()->forMember($data->member)->forProject($from)->forTask($task)->create();
+        Passport::actingAs($data->user);
+
+        $preview = $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'project_id' => $to->id]);
+        $this->assertNull($preview['after']['task_id']);
+        $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'project_id' => $to->id, ...$preview['confirm_with']]);
+        $this->assertNull($entry->refresh()->task_id);
     }
 }

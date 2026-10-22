@@ -49,6 +49,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\File;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -986,11 +987,13 @@ class TimeEntryController extends Controller
     /**
      * Delete time entry
      *
+     * With `If-Match` set to the entry's `ETag`, the deletion is refused with 412 if the entry changed after it was read.
+     *
      * @throws AuthorizationException
      *
      * @operationId deleteTimeEntry
      */
-    public function destroy(Organization $organization, TimeEntry $timeEntry): JsonResponse
+    public function destroy(Organization $organization, TimeEntry $timeEntry, Request $request): JsonResponse
     {
         $member = $this->member($organization);
         if ($timeEntry->member_id === $member->getKey()) {
@@ -999,17 +1002,26 @@ class TimeEntryController extends Controller
             $this->checkPermission($organization, 'time-entries:delete:all', $timeEntry);
         }
 
-        $project = $timeEntry->project;
-        $task = $timeEntry->task;
+        $ifMatch = $request->header('If-Match');
+        DB::transaction(function () use ($timeEntry, $ifMatch): void {
+            /** @var TimeEntry $locked */
+            $locked = TimeEntry::query()->whereKey($timeEntry->getKey())->lockForUpdate()->firstOrFail();
+            if ($ifMatch !== null && ! hash_equals(TimeEntryResource::etag($locked), trim(str_replace('W/', '', $ifMatch), " \t\""))) {
+                abort(412, 'The time entry changed since it was read.');
+            }
+            $project = $locked->project;
+            $task = $locked->task;
 
-        $timeEntry->delete();
+            $locked->delete();
 
-        if ($project !== null) {
-            RecalculateSpentTimeForProject::dispatch($project);
-        }
-        if ($task !== null) {
-            RecalculateSpentTimeForTask::dispatch($task);
-        }
+            // The recalculation must see the entry gone
+            if ($project !== null) {
+                RecalculateSpentTimeForProject::dispatch($project)->afterCommit();
+            }
+            if ($task !== null) {
+                RecalculateSpentTimeForTask::dispatch($task)->afterCommit();
+            }
+        });
 
         return response()
             ->json(null, 204);
