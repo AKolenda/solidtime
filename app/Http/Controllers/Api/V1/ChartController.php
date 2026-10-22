@@ -77,7 +77,7 @@ class ChartController extends Controller
      *
      * @operationId latestTeamActivity
      *
-     * @response array<int, array{member_id: string, name: string, description: string|null, time_entry_id: string, task_id: string|null, status: bool }>
+     * @response array<int, array{member_id: string, name: string, description: string|null, time_entry_id: string, task_id: string|null, task_name: string|null, project_id: string|null, project_name: string|null, project_color: string|null, start: string, end: string|null, status: bool }>
      */
     public function latestTeamActivity(Organization $organization, DashboardService $dashboardService, PermissionStore $permissionStore): JsonResponse
     {

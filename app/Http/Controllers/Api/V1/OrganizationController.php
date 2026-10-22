@@ -82,6 +82,9 @@ class OrganizationController extends Controller
         if ($request->getBreaksEnabled() !== null) {
             $organization->breaks_enabled = $request->getBreaksEnabled();
         }
+        if ($request->has('time_entry_auto_stop_hours')) {
+            $organization->time_entry_auto_stop_hours = $request->getTimeEntryAutoStopHours();
+        }
         if ($request->getShopReportEnabled() !== null) {
             $organization->shop_report_enabled = $request->getShopReportEnabled();
         }

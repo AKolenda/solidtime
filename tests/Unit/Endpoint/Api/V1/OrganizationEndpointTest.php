@@ -379,6 +379,81 @@ class OrganizationEndpointTest extends ApiEndpointTestAbstract
         ]);
     }
 
+    public function test_update_endpoint_can_set_and_clear_the_time_entry_auto_stop_hours(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'organizations:update',
+        ]);
+        $this->assertBillableRateServiceIsUnused();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.organizations.update', [$data->organization->getKey()]), [
+            'time_entry_auto_stop_hours' => 16,
+        ]);
+
+        // Assert
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.time_entry_auto_stop_hours', 16);
+        $this->assertDatabaseHas(Organization::class, [
+            'id' => $data->organization->getKey(),
+            'time_entry_auto_stop_hours' => 16,
+        ]);
+
+        // Act
+        $response = $this->putJson(route('api.v1.organizations.update', [$data->organization->getKey()]), [
+            'time_entry_auto_stop_hours' => null,
+        ]);
+
+        // Assert
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.time_entry_auto_stop_hours', null);
+        $this->assertDatabaseHas(Organization::class, [
+            'id' => $data->organization->getKey(),
+            'time_entry_auto_stop_hours' => null,
+        ]);
+    }
+
+    public function test_update_endpoint_keeps_the_time_entry_auto_stop_hours_if_not_sent(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'organizations:update',
+        ]);
+        $data->organization->time_entry_auto_stop_hours = 16;
+        $data->organization->save();
+        $this->assertBillableRateServiceIsUnused();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.organizations.update', [$data->organization->getKey()]), [
+            'name' => 'Renamed',
+        ]);
+
+        // Assert
+        $response->assertStatus(200);
+        $response->assertJsonPath('data.time_entry_auto_stop_hours', 16);
+    }
+
+    public function test_update_endpoint_fails_if_the_time_entry_auto_stop_hours_are_out_of_range(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'organizations:update',
+        ]);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->putJson(route('api.v1.organizations.update', [$data->organization->getKey()]), [
+            'time_entry_auto_stop_hours' => 0,
+        ]);
+
+        // Assert
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['time_entry_auto_stop_hours']);
+    }
+
     public function test_update_endpoint_can_configure_shop_reports_and_logo(): void
     {
         $data = $this->createUserWithPermission(['organizations:update']);

@@ -62,6 +62,8 @@ class OrganizationResource extends BaseResource
             'prevent_overlapping_time_entries' => $this->resource->prevent_overlapping_time_entries,
             /** Whether members of the organization can track breaks */
             'breaks_enabled' => $this->resource->breaks_enabled,
+            /** Running time entries are stopped automatically after this many hours (null = never) */
+            'time_entry_auto_stop_hours' => $this->resource->time_entry_auto_stop_hours,
             /** Use the shop-specific single-project PDF layout */
             'shop_report_enabled' => $this->resource->shop_report_enabled,
             /** Data URL for the report logo */
