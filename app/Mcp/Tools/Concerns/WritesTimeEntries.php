@@ -110,7 +110,8 @@ trait WritesTimeEntries
     {
         $entry = [...$base, ...$body];
         if (isset($body['member_id'])) {
-            $entry['user_id'] = $context->organization->members()->whereKey($body['member_id'])->value('user_id');
+            $entry['user_id'] = $context->organization->members()->whereKey($body['member_id'])->value('user_id')
+                ?? throw new ToolError('Member not found in this organization.', 404);
         }
         $start = isset($entry['start']) ? strtotime((string) $entry['start']) : false;
         $end = isset($entry['end']) ? strtotime((string) $entry['end']) : false;

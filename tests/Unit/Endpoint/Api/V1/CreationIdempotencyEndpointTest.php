@@ -201,5 +201,10 @@ class CreationIdempotencyEndpointTest extends ApiEndpointTestAbstract
         $first = $this->postJson($url, $payload, $this->headers)->assertCreated();
         $this->assertSame($first->json(), $this->postJson($url, $payload, [...$this->headers, 'Idempotency-Replay-Only' => '1'])->assertCreated()->json());
         $this->assertDatabaseCount('time_entries', 1);
+
+        // Without the key there is nothing to recover, and nothing is created
+        $this->postJson(route('api.v1.time-entries.store', [$data->organization->id]), $payload, ['Idempotency-Replay-Only' => '1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('Idempotency-Key');
+        $this->assertDatabaseCount('time_entries', 1);
     }
 }

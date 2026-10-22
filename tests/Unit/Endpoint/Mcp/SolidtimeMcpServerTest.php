@@ -796,6 +796,18 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertSame(2, $reads);
     }
 
+    public function test_a_member_of_another_organization_is_refused_before_the_preview(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $other = $this->createUserWithRole(Role::Admin);
+        $entry = TimeEntry::factory()->forMember($data->member)->create();
+        Passport::actingAs($data->user);
+
+        $this->assertStringContainsString('Member not found', $this->error('create_time_entry', ['member_id' => $other->member->id, 'start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T09:00:00Z']));
+        $this->assertStringContainsString('Member not found', $this->error('start_timer', ['member_id' => $other->member->id]));
+        $this->assertStringContainsString('Member not found', $this->error('update_time_entry', ['time_entry_id' => $entry->id, 'member_id' => $other->member->id]));
+    }
+
     public function test_the_billable_default_shown_in_the_preview_is_kept_on_confirmation(): void
     {
         $data = $this->createUserWithRole(Role::Admin);

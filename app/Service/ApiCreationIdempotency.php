@@ -102,6 +102,10 @@ class ApiCreationIdempotency
     private function key(Request $request): ?string
     {
         $key = $request->header('Idempotency-Key');
+        // A recovery must never make the change it asks about, which it would without a key
+        if ($key === null && $request->hasHeader('Idempotency-Replay-Only')) {
+            throw ValidationException::withMessages(['Idempotency-Key' => 'Idempotency-Replay-Only needs the Idempotency-Key of the request to recover.']);
+        }
         if ($key !== null && ! preg_match('/\A[A-Za-z0-9:_-]{16,128}\z/', $key)) {
             throw ValidationException::withMessages(['Idempotency-Key' => 'Use 16 to 128 letters, numbers, colons, underscores or hyphens.']);
         }
