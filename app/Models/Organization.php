@@ -36,6 +36,7 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property bool $breaks_enabled
  * @property bool $shop_report_enabled
  * @property string|null $shop_report_logo
+ * @property int|null $time_entry_auto_stop_hours
  * @property User $owner
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -74,6 +75,7 @@ class Organization extends Model implements AuditableContract
         'prevent_overlapping_time_entries' => 'boolean',
         'breaks_enabled' => 'boolean',
         'shop_report_enabled' => 'boolean',
+        'time_entry_auto_stop_hours' => 'integer',
         'number_format' => NumberFormat::class,
         'currency_format' => CurrencyFormat::class,
         'date_format' => DateFormat::class,

@@ -55,6 +55,13 @@ class OrganizationUpdateRequest extends BaseFormRequest
             'breaks_enabled' => [
                 'boolean',
             ],
+            // Stop running time entries automatically after this many hours, null disables it
+            'time_entry_auto_stop_hours' => [
+                'nullable',
+                'integer',
+                'min:1',
+                'max:168',
+            ],
             'shop_report_enabled' => [
                 'boolean',
             ],
@@ -142,6 +149,11 @@ class OrganizationUpdateRequest extends BaseFormRequest
     public function getBreaksEnabled(): ?bool
     {
         return $this->has('breaks_enabled') ? $this->boolean('breaks_enabled') : null;
+    }
+
+    public function getTimeEntryAutoStopHours(): ?int
+    {
+        return $this->input('time_entry_auto_stop_hours') !== null ? (int) $this->input('time_entry_auto_stop_hours') : null;
     }
 
     public function getShopReportEnabled(): ?bool

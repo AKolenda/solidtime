@@ -343,6 +343,7 @@ const OrganizationResource = z
         employees_can_manage_tasks: z.boolean(),
         prevent_overlapping_time_entries: z.boolean(),
         breaks_enabled: z.boolean(),
+        time_entry_auto_stop_hours: z.union([z.number(), z.null()]),
         shop_report_enabled: z.boolean(),
         shop_report_logo: z.union([z.string(), z.null()]),
         currency: z.string(),
@@ -363,6 +364,7 @@ const OrganizationUpdateRequest = z
         employees_can_manage_tasks: z.boolean(),
         prevent_overlapping_time_entries: z.boolean(),
         breaks_enabled: z.boolean(),
+        time_entry_auto_stop_hours: z.union([z.number().int().gte(1).lte(168), z.null()]),
         shop_report_enabled: z.boolean(),
         shop_report_logo: z.union([z.string(), z.null()]),
         number_format: NumberFormat,
@@ -1214,6 +1216,12 @@ const endpoints = makeApi([
                     description: z.union([z.string(), z.null()]),
                     time_entry_id: z.string(),
                     task_id: z.union([z.string(), z.null()]),
+                    task_name: z.union([z.string(), z.null()]),
+                    project_id: z.union([z.string(), z.null()]),
+                    project_name: z.union([z.string(), z.null()]),
+                    project_color: z.union([z.string(), z.null()]),
+                    start: z.string(),
+                    end: z.union([z.string(), z.null()]),
                     status: z.boolean(),
                 })
                 .passthrough()
@@ -4583,6 +4591,49 @@ Users with the permission &#x60;time-entries:view:own&#x60; can only use this en
                 schema: z
                     .object({ message: z.string(), errors: z.record(z.array(z.string())) })
                     .passthrough(),
+            },
+        ],
+    },
+    {
+        method: 'post',
+        path: '/v1/organizations/:organization/time-entries/:timeEntry/stop',
+        alias: 'stopTimeEntry',
+        requestFormat: 'json',
+        parameters: [
+            {
+                name: 'organization',
+                type: 'Path',
+                schema: z.string(),
+            },
+            {
+                name: 'timeEntry',
+                type: 'Path',
+                schema: z.string(),
+            },
+        ],
+        response: z.object({ data: TimeEntryResource }).passthrough(),
+        errors: [
+            {
+                status: 400,
+                description: `API exception`,
+                schema: z
+                    .object({ error: z.boolean(), key: z.string(), message: z.string() })
+                    .passthrough(),
+            },
+            {
+                status: 401,
+                description: `Unauthenticated`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 403,
+                description: `Authorization error`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 404,
+                description: `Not found`,
+                schema: z.object({ message: z.string() }).passthrough(),
             },
         ],
     },

@@ -402,37 +402,52 @@ class DashboardServiceTest extends TestCase
         ], $result);
     }
 
-    public function test_latest_team_activity_returns_the_most_current_working_users_and_what_they_are_working_on(): void
+    public function test_latest_team_activity_returns_every_member_with_the_working_members_first(): void
     {
         // Arrange
+        $this->travelTo(Carbon::create(2024, 1, 1, 12, 0, 0, 'UTC'));
         $organization = Organization::factory()->create();
         $member1 = Member::factory()->forOrganization($organization)->create();
         $member2 = Member::factory()->forOrganization($organization)->create();
         $member3 = Member::factory()->forOrganization($organization)->create();
         $member4 = Member::factory()->forOrganization($organization)->create();
         $member5 = Member::factory()->forOrganization($organization)->create();
-        $task1 = Task::factory()->forOrganization($organization)->create();
-        $timeEntry1 = TimeEntry::factory()->forMember($member1)->forOrganization($organization)->active()->create([
+        $member6 = Member::factory()->forOrganization($organization)->create();
+        $placeholder = Member::factory()->forOrganization($organization)->role(Role::Placeholder)->create();
+        $project = Project::factory()->forOrganization($organization)->create();
+        $task = Task::factory()->forOrganization($organization)->forProject($project)->create();
+        // Started hours before the members who stopped, but is still working, so it comes before them
+        $timeEntry1 = TimeEntry::factory()->forMember($member1)->forOrganization($organization)->forTask($task)->active()->create([
+            'start' => now()->subHours(9),
+        ]);
+        $timeEntry2 = TimeEntry::factory()->forMember($member2)->forOrganization($organization)->active()->create([
             'start' => now()->subMinutes(10),
         ]);
-        $timeEntry2 = TimeEntry::factory()->forMember($member2)->forOrganization($organization)->create([
-            'start' => now()->subMinutes(20),
-        ]);
-        $timeEntry3 = TimeEntry::factory()->forMember($member3)->forOrganization($organization)->forTask($task1)->create([
+        $timeEntry3 = TimeEntry::factory()->forMember($member3)->forOrganization($organization)->create([
             'description' => '',
-            'start' => now()->subMinutes(30),
+            'start' => now()->subMinutes(60),
+            'end' => now()->subMinutes(5),
         ]);
-        $timeEntry4 = TimeEntry::factory()->forMember($member4)->forOrganization($organization)->forTask($task1)->create([
+        $timeEntry4 = TimeEntry::factory()->forMember($member4)->forOrganization($organization)->forTask($task)->create([
             'description' => 'TEST 123',
             'start' => now()->subMinutes(40),
+            'end' => now()->subMinutes(20),
         ]);
-        $timeEntry5 = TimeEntry::factory()->forMember($member4)->forOrganization($organization)->forTask($task1)->create([
+        TimeEntry::factory()->forMember($member4)->forOrganization($organization)->forTask($task)->create([
             'description' => 'TEST 321',
             'start' => now()->subMinutes(50),
+            'end' => now()->subMinutes(45),
         ]);
-        $timeEntry6 = TimeEntry::factory()->forMember($member5)->forOrganization($organization)->forTask($task1)->create([
-            'description' => 'TEST 321',
-            'start' => now()->subMinutes(60),
+        $timeEntry5 = TimeEntry::factory()->forMember($member5)->forOrganization($organization)->create([
+            'start' => now()->subDays(3),
+            'end' => now()->subDays(3)->addHour(),
+        ]);
+        $timeEntry6 = TimeEntry::factory()->forMember($member6)->forOrganization($organization)->create([
+            'start' => now()->subDays(2),
+            'end' => now()->subDays(2)->addHour(),
+        ]);
+        TimeEntry::factory()->forMember($placeholder)->forOrganization($organization)->active()->create([
+            'start' => now()->subMinutes(5),
         ]);
 
         // Act
@@ -441,27 +456,45 @@ class DashboardServiceTest extends TestCase
         // Assert
         $this->assertSame([
             [
-                'member_id' => $member1->getKey(),
-                'name' => $member1->user->name,
-                'description' => $timeEntry1->description,
-                'time_entry_id' => $timeEntry1->getKey(),
-                'task_id' => null,
-                'status' => true,
-            ],
-            [
                 'member_id' => $member2->getKey(),
                 'name' => $member2->user->name,
                 'description' => $timeEntry2->description,
                 'time_entry_id' => $timeEntry2->getKey(),
                 'task_id' => null,
-                'status' => false,
+                'task_name' => null,
+                'project_id' => null,
+                'project_name' => null,
+                'project_color' => null,
+                'start' => '2024-01-01T11:50:00Z',
+                'end' => null,
+                'status' => true,
+            ],
+            [
+                'member_id' => $member1->getKey(),
+                'name' => $member1->user->name,
+                'description' => $timeEntry1->description,
+                'time_entry_id' => $timeEntry1->getKey(),
+                'task_id' => $task->getKey(),
+                'task_name' => $task->name,
+                'project_id' => $project->getKey(),
+                'project_name' => $project->name,
+                'project_color' => $project->color,
+                'start' => '2024-01-01T03:00:00Z',
+                'end' => null,
+                'status' => true,
             ],
             [
                 'member_id' => $member3->getKey(),
                 'name' => $member3->user->name,
                 'description' => $timeEntry3->description,
                 'time_entry_id' => $timeEntry3->getKey(),
-                'task_id' => $task1->getKey(),
+                'task_id' => null,
+                'task_name' => null,
+                'project_id' => null,
+                'project_name' => null,
+                'project_color' => null,
+                'start' => '2024-01-01T11:00:00Z',
+                'end' => '2024-01-01T11:55:00Z',
                 'status' => false,
             ],
             [
@@ -469,10 +502,68 @@ class DashboardServiceTest extends TestCase
                 'name' => $member4->user->name,
                 'description' => $timeEntry4->description,
                 'time_entry_id' => $timeEntry4->getKey(),
-                'task_id' => $task1->getKey(),
+                'task_id' => $task->getKey(),
+                'task_name' => $task->name,
+                'project_id' => $project->getKey(),
+                'project_name' => $project->name,
+                'project_color' => $project->color,
+                'start' => '2024-01-01T11:20:00Z',
+                'end' => '2024-01-01T11:40:00Z',
+                'status' => false,
+            ],
+            [
+                'member_id' => $member6->getKey(),
+                'name' => $member6->user->name,
+                'description' => $timeEntry6->description,
+                'time_entry_id' => $timeEntry6->getKey(),
+                'task_id' => null,
+                'task_name' => null,
+                'project_id' => null,
+                'project_name' => null,
+                'project_color' => null,
+                'start' => '2023-12-30T12:00:00Z',
+                'end' => '2023-12-30T13:00:00Z',
+                'status' => false,
+            ],
+            [
+                'member_id' => $member5->getKey(),
+                'name' => $member5->user->name,
+                'description' => $timeEntry5->description,
+                'time_entry_id' => $timeEntry5->getKey(),
+                'task_id' => null,
+                'task_name' => null,
+                'project_id' => null,
+                'project_name' => null,
+                'project_color' => null,
+                'start' => '2023-12-29T12:00:00Z',
+                'end' => '2023-12-29T13:00:00Z',
                 'status' => false,
             ],
         ], $result);
+    }
+
+    public function test_latest_team_activity_prefers_the_running_time_entry_over_a_later_finished_one(): void
+    {
+        // Arrange
+        $this->travelTo(Carbon::create(2024, 1, 1, 12, 0, 0, 'UTC'));
+        $organization = Organization::factory()->create();
+        $member = Member::factory()->forOrganization($organization)->create();
+        $runningTimeEntry = TimeEntry::factory()->forMember($member)->forOrganization($organization)->active()->create([
+            'start' => now()->subHours(3),
+        ]);
+        // Overlapping entries are possible if the organization does not prevent them
+        TimeEntry::factory()->forMember($member)->forOrganization($organization)->create([
+            'start' => now()->subHours(2),
+            'end' => now()->subHour(),
+        ]);
+
+        // Act
+        $result = $this->dashboardService->latestTeamActivity($organization);
+
+        // Assert
+        $this->assertCount(1, $result);
+        $this->assertSame($runningTimeEntry->getKey(), $result[0]['time_entry_id']);
+        $this->assertTrue($result[0]['status']);
     }
 
     public function test_latest_tasks_returns_the_4_tasks_with_the_latest_time_entries(): void
