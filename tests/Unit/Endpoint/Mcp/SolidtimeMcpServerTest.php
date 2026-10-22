@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Unit\Endpoint\Mcp;
 
 use App\Enums\Role;
+use App\Models\Client;
 use App\Models\McpToolCall;
 use App\Models\Member;
 use App\Models\Organization;
 use App\Models\Project;
+use App\Models\Tag;
 use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Models\User;
@@ -50,6 +52,19 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertFalse($response->json('result.isError'), (string) $response->json('result.content.0.text'));
 
         return json_decode((string) $response->json('result.content.0.text'), true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * Preview a change, then confirm it with what the preview asked for.
+     *
+     * @param  array<string, mixed>  $arguments
+     * @return array<string, mixed>
+     */
+    private function confirmed(string $tool, array $arguments): array
+    {
+        $preview = $this->ok($tool, $arguments);
+
+        return $this->ok($tool, [...$arguments, ...$preview['confirm_with']]);
     }
 
     /**
@@ -253,7 +268,8 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
 
         $this->assertStringContainsString('"time_entry_id":"'.$running->id.'"', $preview['next_step']);
         $this->assertStringContainsString('time_entry_id from the preview', $this->error('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', 'confirm' => true]));
-        $this->ok('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', 'time_entry_id' => $running->id, 'confirm' => true]);
+        $this->assertStringContainsString('expected_version', $this->error('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', 'time_entry_id' => $running->id, 'confirm' => true]));
+        $this->ok('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', ...$preview['confirm_with']]);
         $this->assertSame('2026-10-21 15:30:00', $running->refresh()->end->toDateTimeString());
         $this->assertSame('You have no running timer in this organization.', $this->error('stop_timer'));
     }
@@ -285,7 +301,7 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $preview = $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'description' => 'Deburr', 'end' => '2026-10-20T10:00:00Z']);
         $this->assertSame('Old', $preview['before']['description']);
         $this->assertEquals(2.0, $preview['after']['hours']);
-        $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'description' => 'Deburr', 'end' => '2026-10-20T10:00:00Z', 'confirm' => true]);
+        $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'description' => 'Deburr', 'end' => '2026-10-20T10:00:00Z', ...$preview['confirm_with']]);
         $this->assertSame('Deburr', $entry->refresh()->description);
 
         $this->ok('delete_time_entry', ['time_entry_id' => $entry->id]);
@@ -548,7 +564,7 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $loose = TimeEntry::factory()->forMember($data->member)->create(['project_id' => null, 'task_id' => null]);
         Passport::actingAs($data->user);
 
-        $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'task_id' => $milling->id, 'confirm' => true]);
+        $this->confirmed('update_time_entry', ['time_entry_id' => $entry->id, 'task_id' => $milling->id]);
         $this->assertSame($milling->id, $entry->refresh()->task_id);
         $this->assertStringContainsString('project_id too', $this->error('update_time_entry', ['time_entry_id' => $loose->id, 'task_id' => $milling->id]));
     }
@@ -567,5 +583,49 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $entries = $this->ok('list_time_entries', ['limit' => 100])['entries'];
         $this->assertCount(27, $entries);
         $this->assertSame([], array_filter($entries, fn (array $entry): bool => $entry['task'] === null));
+    }
+
+    public function test_a_confirmation_changes_only_the_previewed_state(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $entry = TimeEntry::factory()->forMember($data->member)->startWithDuration(Carbon::parse('2026-10-20 08:00:00'), 3600)->create(['description' => 'Turning']);
+        Passport::actingAs($data->user);
+
+        $preview = $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'description' => 'Deburr']);
+        $entry->update(['description' => 'Edited meanwhile']);
+        $this->assertStringContainsString('changed', $this->error('update_time_entry', ['time_entry_id' => $entry->id, 'description' => 'Deburr', ...$preview['confirm_with']]));
+        $this->assertSame('Edited meanwhile', $entry->refresh()->description);
+    }
+
+    public function test_an_end_before_the_start_is_refused_at_the_preview(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $entry = TimeEntry::factory()->forMember($data->member)->startWithDuration(Carbon::parse('2026-10-20 08:00:00'), 3600)->create();
+        $running = TimeEntry::factory()->forMember($data->member)->create(['start' => Carbon::parse('2026-10-21 13:00:00'), 'end' => null]);
+        Passport::actingAs($data->user);
+
+        $this->assertStringContainsString('before the start', $this->error('create_time_entry', ['start' => '2026-10-22T10:00:00Z', 'end' => '2026-10-22T09:00:00Z']));
+        $this->assertStringContainsString('before the start', $this->error('update_time_entry', ['time_entry_id' => $entry->id, 'end' => '2026-10-20T07:00:00Z']));
+        $this->assertStringContainsString('before the timer started', $this->error('stop_timer', ['time_entry_id' => $running->id, 'end' => '2026-10-21T12:00:00Z']));
+    }
+
+    public function test_members_tags_and_clients_list_with_a_search(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $this->teammate($data->organization);
+        Tag::factory()->forOrganization($data->organization)->create(['name' => 'Lathe 3']);
+        Tag::factory()->forOrganization($data->organization)->create(['name' => 'Mill 1']);
+        Client::factory()->forOrganization($data->organization)->create(['name' => 'Warrior Rig']);
+        Client::factory()->forOrganization($data->organization)->create(['name' => 'Compact Compression']);
+        Passport::actingAs($data->user);
+
+        $this->assertSame(3, $this->ok('list_members')['count']);
+        $this->assertSame([$data->user->name], array_column($this->ok('list_members', ['search' => $data->user->name])['members'], 'name'));
+        $this->assertSame(['Lathe 3'], array_column($this->ok('list_tags', ['search' => 'lathe'])['tags'], 'name'));
+        $this->assertSame(['Warrior Rig'], array_column($this->ok('list_clients', ['search' => 'warrior'])['clients'], 'name'));
+
+        $employee = $this->teammate($data->organization);
+        Passport::actingAs($employee->user);
+        $this->assertStringContainsString('permission', $this->error('list_members'));
     }
 }

@@ -7,6 +7,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\PlannedChange;
 use App\Mcp\ToolContext;
 use App\Mcp\ToolError;
+use App\Mcp\Tools\Concerns\BindsToPreviewedVersion;
 use App\Mcp\Tools\Concerns\FindsRecords;
 use App\Mcp\Tools\Concerns\WritesTimeEntries;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,6 +18,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 #[IsIdempotent]
 class StopTimer extends WriteTool
 {
+    use BindsToPreviewedVersion;
     use FindsRecords;
     use WritesTimeEntries;
 
@@ -29,6 +31,7 @@ class StopTimer extends WriteTool
         return [
             'time_entry_id' => $schema->string()->format('uuid')->description('The running entry to stop. Defaults to your own running timer.'),
             'end' => $schema->string()->format('date-time')->description('When it stopped (ISO 8601 with offset). Defaults to the moment of confirmation.'),
+            'expected_version' => $this->versionArgument($schema),
         ];
     }
 
@@ -37,6 +40,7 @@ class StopTimer extends WriteTool
         return [
             'time_entry_id' => ['sometimes', 'string', 'uuid'],
             'end' => ['sometimes', 'string', 'date'],
+            'expected_version' => $this->versionRule(),
         ];
     }
 
@@ -56,9 +60,12 @@ class StopTimer extends WriteTool
             throw new ToolError('That time entry is not running.', 409);
         }
         $body = ['end' => $this->utc($input['end'] ?? now()->toIso8601String())];
+        if (strtotime($body['end']) < strtotime((string) $entry['start'])) {
+            throw new ToolError('The end must not be before the timer started.');
+        }
 
         return new PlannedChange('Stop the running timer', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
             $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context),
-            $etag === null ? [] : ['If-Match' => $etag], isset($input['time_entry_id']) ? [] : ['time_entry_id' => $entry['id']]);
+            $this->versionHeaders($input), [...(isset($input['time_entry_id']) ? [] : ['time_entry_id' => $entry['id']]), ...($etag === null ? [] : ['expected_version' => $etag])]);
     }
 }

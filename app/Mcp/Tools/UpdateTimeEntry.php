@@ -7,6 +7,7 @@ namespace App\Mcp\Tools;
 use App\Mcp\PlannedChange;
 use App\Mcp\ToolContext;
 use App\Mcp\ToolError;
+use App\Mcp\Tools\Concerns\BindsToPreviewedVersion;
 use App\Mcp\Tools\Concerns\FindsRecords;
 use App\Mcp\Tools\Concerns\WritesTimeEntries;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -15,6 +16,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 #[IsIdempotent]
 class UpdateTimeEntry extends WriteTool
 {
+    use BindsToPreviewedVersion;
     use FindsRecords;
     use WritesTimeEntries;
 
@@ -31,6 +33,7 @@ class UpdateTimeEntry extends WriteTool
             'task_id' => $schema->string()->format('uuid')->nullable()->description('New task of the project, or null to clear it.'),
             'start' => $schema->string()->format('date-time')->description('New start (ISO 8601 with offset).'),
             'end' => $schema->string()->format('date-time')->description('New end (ISO 8601 with offset).'),
+            'expected_version' => $this->versionArgument($schema),
         ];
     }
 
@@ -41,6 +44,7 @@ class UpdateTimeEntry extends WriteTool
             ...$this->entryRules(),
             'start' => ['sometimes', 'string', 'date'],
             'end' => ['sometimes', 'string', 'date'],
+            'expected_version' => $this->versionRule(),
         ];
     }
 
@@ -66,9 +70,13 @@ class UpdateTimeEntry extends WriteTool
         if ($body === []) {
             throw new ToolError('Pass at least one field to change.');
         }
+        $end = array_key_exists('end', $body) ? $body['end'] : $entry['end'];
+        if ($end !== null && strtotime((string) $end) < strtotime((string) ($body['start'] ?? $entry['start']))) {
+            throw new ToolError('The end must not be before the start.');
+        }
 
         return new PlannedChange('Change a time entry', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
             $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context),
-            $etag === null ? [] : ['If-Match' => $etag]);
+            $this->versionHeaders($input), $etag === null ? [] : ['expected_version' => $etag]);
     }
 }

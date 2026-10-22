@@ -79,24 +79,4 @@ class InternalApi
 
         return [$body, $response->headers];
     }
-
-    /**
-     * Read every page of a page-paginated list, up to a bound.
-     *
-     * @param  array<string, mixed>  $query
-     * @return array<int, array<string, mixed>>
-     */
-    public function all(string $path, array $query = [], int $maxPages = 100): array
-    {
-        $items = [];
-        for ($page = 1; $page <= $maxPages; $page++) {
-            $body = $this->send('GET', $path, [...$query, 'page' => $page]);
-            array_push($items, ...($body['data'] ?? []));
-            $last = $body['meta']['last_page'] ?? null;
-            if (! is_int($last) || $page >= $last) {
-                return $items;
-            }
-        }
-        throw new ToolError('There are too many records to list at once. Narrow the request.');
-    }
 }

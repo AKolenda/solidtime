@@ -6,6 +6,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\PlannedChange;
 use App\Mcp\ToolContext;
+use App\Mcp\ToolError;
 use App\Mcp\Tools\Concerns\CreatesIdempotently;
 use App\Mcp\Tools\Concerns\FindsRecords;
 use App\Mcp\Tools\Concerns\WritesTimeEntries;
@@ -46,6 +47,9 @@ class CreateTimeEntry extends WriteTool
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
         $body = $this->newEntryBody($input, $context, $this->utc($input['start']), $this->utc($input['end']));
+        if (strtotime((string) $body['end']) < strtotime((string) $body['start'])) {
+            throw new ToolError('The end must not be before the start.');
+        }
 
         return new PlannedChange('Add a time entry', 'POST', $context->path('time-entries'), $body, null, $this->entryPreview($body, $context),
             $this->presentEntry($context), $this->idempotencyHeaders($input['request_id'] ?? null));

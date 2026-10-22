@@ -68,6 +68,12 @@ destructive. Stop and update tools carry `idempotentHint`.
 2. Only the same call with `confirm: true` (the boolean) makes the change. The
    AI may set it only after the user approved that preview.
 
+The preview's `confirm_with` lists what the confirming call must add. For
+`update_time_entry` and `stop_timer` that is the entry's `expected_version`,
+and for a `stop_timer` without `time_entry_id` also the timer it found. So a
+confirmation changes only the state the user saw, and an entry changed since
+the preview is refused (412).
+
 Creations accept an optional `request_id`. It is sent as the API's
 `Idempotency-Key`, so a retried call returns the first result.
 
