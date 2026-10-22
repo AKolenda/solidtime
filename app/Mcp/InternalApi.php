@@ -7,6 +7,7 @@ namespace App\Mcp;
 use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Facade;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 
 /**
  * Sends MCP tool calls through the regular /api/v1 routes as the same user, so every
@@ -24,6 +25,20 @@ class InternalApi
      * @throws ToolError when the API refuses the request
      */
     public function send(string $method, string $path, array $data = [], array $headers = []): array
+    {
+        return $this->sendWithHeaders($method, $path, $data, $headers)[0];
+    }
+
+    /**
+     * As send(), with the response headers (such as ETag) as well.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $headers
+     * @return array{0: array<string, mixed>, 1: ResponseHeaderBag}
+     *
+     * @throws ToolError when the API refuses the request
+     */
+    public function sendWithHeaders(string $method, string $path, array $data = [], array $headers = []): array
     {
         $original = app('request');
         $server = [
@@ -62,7 +77,7 @@ class InternalApi
             throw ToolError::fromApi($status, $body);
         }
 
-        return $body;
+        return [$body, $response->headers];
     }
 
     /**

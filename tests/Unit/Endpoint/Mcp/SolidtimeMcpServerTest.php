@@ -247,7 +247,7 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
 
         $this->ok('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', 'confirm' => true]);
         $this->assertSame('2026-10-21 15:30:00', $running->refresh()->end->toDateTimeString());
-        $this->assertSame('You have no running timer.', $this->error('stop_timer'));
+        $this->assertSame('You have no running timer in this organization.', $this->error('stop_timer'));
     }
 
     public function test_api_rules_apply_to_confirmed_changes(): void
@@ -441,5 +441,26 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
 
         $this->assertStringContainsString('255', $this->error('create_task', ['project_id' => $project->id, 'name' => str_repeat('x', 256)]));
         $this->assertSame(0, Task::query()->count());
+    }
+
+    public function test_stop_timer_finds_the_running_timer_of_the_selected_organization(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $other = Organization::factory()->create();
+        $otherMember = Member::factory()->forUser($data->user)->forOrganization($other)->role(Role::Employee)->create();
+        TimeEntry::factory()->forMember($otherMember)->create(['start' => Carbon::parse('2026-10-21 13:00:00'), 'end' => null]);
+        Passport::actingAs($data->user);
+
+        $this->assertStringContainsString('no running timer in this organization', $this->error('stop_timer'));
+        $this->assertTrue($this->ok('stop_timer', ['organization_id' => $other->id])['before']['running']);
+    }
+
+    public function test_estimated_hours_stay_within_what_the_api_stores(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        Passport::actingAs($data->user);
+
+        $this->error('create_project', ['name' => 'Job 1', 'estimated_hours' => 600000]);
+        $this->assertSame(596523.0, (float) $this->ok('create_project', ['name' => 'Job 1', 'estimated_hours' => 596523])['after']['estimated_hours']);
     }
 }

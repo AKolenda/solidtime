@@ -24,7 +24,7 @@ trait WritesProjects
             'client_id' => $schema->string()->format('uuid')->nullable()->description('Client (customer) from list_clients, or null for none.'),
             'is_billable' => $schema->boolean()->description('Time on this project is billable.'),
             'is_public' => $schema->boolean()->description('Visible to every member, not only project members.'),
-            'estimated_hours' => $schema->number()->min(0)->max(1000000)->nullable()->description('Estimated hours for the whole project, or null for none.'),
+            'estimated_hours' => $schema->number()->min(0)->max(596523)->nullable()->description('Estimated hours for the whole project, or null for none.'),
         ];
     }
 
@@ -38,7 +38,7 @@ trait WritesProjects
             'client_id' => ['sometimes', 'nullable', 'string', 'uuid'],
             'is_billable' => ['sometimes', 'boolean:strict'],
             'is_public' => ['sometimes', 'boolean:strict'],
-            'estimated_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000000'],
+            'estimated_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:596523'],
         ];
     }
 

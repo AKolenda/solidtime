@@ -18,11 +18,34 @@ trait FindsRecords
      */
     protected function findTimeEntry(ToolContext $context, string $id): array
     {
+        return $this->findVersionedTimeEntry($context, $id)[0];
+    }
+
+    /**
+     * The entry and its ETag, which an update sends back as If-Match so the API refuses it if
+     * the entry changed in between.
+     *
+     * @return array{0: array<string, mixed>, 1: string|null}
+     */
+    protected function findVersionedTimeEntry(ToolContext $context, string $id): array
+    {
         try {
-            return $context->api->send('GET', $context->path('time-entries/'.$id))['data'] ?? [];
+            [$body, $headers] = $context->api->sendWithHeaders('GET', $context->path('time-entries/'.$id));
+
+            return [$body['data'] ?? [], $headers->get('ETag')];
         } catch (ToolError $error) {
             throw new ToolError('Time entry not found, or not visible to you.', $error->status === 401 ? 401 : 404);
         }
+    }
+
+    /**
+     * The id of the user's running timer in this organization, if there is one.
+     */
+    protected function runningTimerId(ToolContext $context): ?string
+    {
+        /** @var string|null */
+        return TimeEntry::query()->whereBelongsTo($context->organization, 'organization')
+            ->where('user_id', $context->user->getKey())->whereNull('end')->latest('start')->value('id');
     }
 
     /**

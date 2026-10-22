@@ -46,7 +46,7 @@ class UpdateTimeEntry extends WriteTool
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
-        $entry = $this->findTimeEntry($context, $input['time_entry_id']);
+        [$entry, $etag] = $this->findVersionedTimeEntry($context, $input['time_entry_id']);
         $body = array_intersect_key($input, array_flip(['member_id', 'project_id', 'task_id', 'description', 'billable', 'tags']));
         foreach (['start', 'end'] as $key) {
             if (isset($input[$key])) {
@@ -61,6 +61,7 @@ class UpdateTimeEntry extends WriteTool
         }
 
         return new PlannedChange('Change a time entry', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
-            $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context));
+            $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context),
+            $etag === null ? [] : ['If-Match' => $etag]);
     }
 }

@@ -29,7 +29,7 @@ class CreateTask extends WriteTool
         return [
             'project_id' => $schema->string()->format('uuid')->required(),
             'name' => $schema->string()->min(1)->max(255)->required(),
-            'estimated_hours' => $schema->number()->min(0)->max(1000000)->nullable()->description('Estimated hours for this task.'),
+            'estimated_hours' => $schema->number()->min(0)->max(596523)->nullable()->description('Estimated hours for this task.'),
             'request_id' => $this->requestIdArgument($schema),
         ];
     }
@@ -39,7 +39,7 @@ class CreateTask extends WriteTool
         return [
             'project_id' => ['required', 'string', 'uuid'],
             'name' => ['required', 'string', 'min:1', 'max:255'],
-            'estimated_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000000'],
+            'estimated_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:596523'],
             'request_id' => $this->requestIdRule(),
         ];
     }

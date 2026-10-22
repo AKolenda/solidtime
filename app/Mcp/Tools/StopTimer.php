@@ -42,16 +42,18 @@ class StopTimer extends WriteTool
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
-        $entry = isset($input['time_entry_id']) ? $this->findTimeEntry($context, $input['time_entry_id']) : $this->runningTimer($context);
-        if ($entry === null) {
-            throw new ToolError('You have no running timer.', 404);
+        $id = $input['time_entry_id'] ?? $this->runningTimerId($context);
+        if ($id === null) {
+            throw new ToolError('You have no running timer in this organization.', 404);
         }
+        [$entry, $etag] = $this->findVersionedTimeEntry($context, $id);
         if ($entry['end'] !== null) {
             throw new ToolError('That time entry is not running.', 409);
         }
         $body = ['end' => $this->utc($input['end'] ?? now()->toIso8601String())];
 
         return new PlannedChange('Stop the running timer', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
-            $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context));
+            $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context),
+            $etag === null ? [] : ['If-Match' => $etag]);
     }
 }
