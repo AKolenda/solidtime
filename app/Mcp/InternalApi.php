@@ -71,7 +71,7 @@ class InternalApi
      * @param  array<string, mixed>  $query
      * @return array<int, array<string, mixed>>
      */
-    public function all(string $path, array $query = [], int $maxPages = 20): array
+    public function all(string $path, array $query = [], int $maxPages = 100): array
     {
         $items = [];
         for ($page = 1; $page <= $maxPages; $page++) {

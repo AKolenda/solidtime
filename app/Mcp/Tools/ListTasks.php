@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Http\Resources\V1\Task\TaskResource;
 use App\Mcp\Present;
 use App\Mcp\ToolContext;
+use App\Mcp\ToolError;
+use App\Models\Task;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
@@ -37,12 +40,21 @@ class ListTasks extends McpTool
 
     protected function run(array $input, ToolContext $context): Response
     {
-        $query = ['done' => $input['done'] ?? 'false'];
-        if (isset($input['project_id'])) {
-            $query['project_id'] = $input['project_id'];
+        $query = $context->visibleTaskQuery();
+        if ($query === null) {
+            throw new ToolError('You do not have permission to see tasks.', 403);
         }
-        $tasks = array_map(fn (array $task): array => Present::task($task), $context->api->all($context->path('tasks'), $query));
+        if (isset($input['project_id'])) {
+            $query->where('project_id', $input['project_id']);
+        }
+        $done = $input['done'] ?? 'false';
+        if ($done !== 'all') {
+            $done === 'true' ? $query->whereNotNull('done_at') : $query->whereNull('done_at');
+        }
+        $count = (clone $query)->count();
+        $tasks = $query->orderBy('created_at', 'desc')->orderBy('id')->limit(300)->get()
+            ->map(fn (Task $task): array => Present::task((new TaskResource($task))->toArray(request())))->all();
 
-        return Response::json(['tasks' => array_slice($tasks, 0, 300), 'count' => count($tasks), 'truncated' => count($tasks) > 300]);
+        return Response::json(['tasks' => $tasks, 'count' => $count, 'truncated' => $count > 300]);
     }
 }

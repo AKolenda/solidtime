@@ -27,7 +27,7 @@ class UpdateTask extends WriteTool
     {
         return [
             'task_id' => $schema->string()->format('uuid')->required(),
-            'name' => $schema->string()->min(1)->max(500),
+            'name' => $schema->string()->min(1)->max(255),
             'is_done' => $schema->boolean(),
             'estimated_hours' => $schema->number()->min(0)->max(1000000)->nullable()->description('Estimated hours, or null for none.'),
         ];
@@ -37,7 +37,7 @@ class UpdateTask extends WriteTool
     {
         return [
             'task_id' => ['required', 'string', 'uuid'],
-            'name' => ['sometimes', 'string', 'min:1', 'max:500'],
+            'name' => ['sometimes', 'string', 'min:1', 'max:255'],
             'is_done' => ['sometimes', 'boolean:strict'],
             'estimated_hours' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:1000000'],
         ];

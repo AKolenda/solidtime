@@ -42,7 +42,9 @@ class ListProjects extends McpTool
     protected function run(array $input, ToolContext $context): Response
     {
         $search = mb_strtolower(trim($input['search'] ?? ''));
-        $projects = collect($context->api->all($context->path('projects'), ['archived' => $input['archived'] ?? 'false']))
+        $archived = $input['archived'] ?? 'false';
+        $projects = collect($context->visibleProjects())
+            ->filter(fn (array $project): bool => $archived === 'all' || ($archived === 'true') === (bool) $project['is_archived'])
             ->map(fn (array $project): array => Present::project($project))
             ->when($search !== '', fn ($projects) => $projects->filter(fn (array $project): bool => str_contains(mb_strtolower((string) $project['name']), $search)))
             ->when(isset($input['client_id']), fn ($projects) => $projects->where('client_id', $input['client_id']))

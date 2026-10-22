@@ -419,4 +419,27 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         Passport::actingAs($data->user);
         $this->assertStringContainsString('3 time entries', $this->ok('delete_task', ['task_id' => $task->id])['summary']);
     }
+
+    public function test_project_search_covers_more_projects_than_twenty_pages(): void
+    {
+        config(['app.pagination_per_page_default' => 2]);
+        $data = $this->createUserWithRole(Role::Admin);
+        Project::factory()->forOrganization($data->organization)->count(44)->create();
+        Project::factory()->forOrganization($data->organization)->create(['name' => '905080158 - 7531 - 2pcs', 'created_at' => now()->subYear()]);
+        Passport::actingAs($data->user);
+
+        $found = $this->ok('list_projects', ['search' => '905080158']);
+        $this->assertSame(['905080158 - 7531 - 2pcs'], array_column($found['projects'], 'name'));
+        $this->assertSame(45, $this->ok('list_projects')['count']);
+    }
+
+    public function test_task_names_follow_the_api_limit(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        $this->assertStringContainsString('255', $this->error('create_task', ['project_id' => $project->id, 'name' => str_repeat('x', 256)]));
+        $this->assertSame(0, Task::query()->count());
+    }
 }

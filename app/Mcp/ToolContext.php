@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
+use App\Http\Resources\V1\Project\ProjectResource;
+use App\Http\Resources\V1\Task\TaskResource;
+use App\Models\Client;
 use App\Models\Member;
 use App\Models\Organization;
+use App\Models\Project;
+use App\Models\Task;
 use App\Models\User;
 use App\Service\PermissionStore;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The signed-in user, the organization a tool call works in, and the API it goes through.
- * Names and records come from the API's own lists, so a tool shows only what the user may see.
+ * Projects, tasks, clients and members are read with the same permission checks and
+ * visibility scopes as the API's index endpoints, so a tool shows only what the user may see,
+ * without paging through every list.
  */
 class ToolContext
 {
@@ -55,7 +63,39 @@ class ToolContext
      */
     public function visibleProjects(): array
     {
-        return $this->projects ??= collect($this->listOrNothing('projects', ['archived' => 'all']))->keyBy('id')->all();
+        if ($this->projects !== null) {
+            return $this->projects;
+        }
+        if (! $this->can('projects:view')) {
+            return $this->projects = [];
+        }
+        // As ProjectController::index
+        $query = Project::query()->whereBelongsTo($this->organization, 'organization');
+        if (! $this->can('projects:view:all')) {
+            $query->visibleByEmployee($this->user);
+        }
+
+        return $this->projects = $query->orderBy('created_at', 'desc')->orderBy('id')->get()
+            ->mapWithKeys(fn (Project $project): array => [$project->getKey() => (new ProjectResource($project, false))->toArray(request())])
+            ->all();
+    }
+
+    /**
+     * Tasks the user may see, as TaskController::index; null without permission to see tasks.
+     *
+     * @return Builder<Task>|null
+     */
+    public function visibleTaskQuery(): ?Builder
+    {
+        if (! $this->can('tasks:view')) {
+            return null;
+        }
+        $query = Task::query()->whereBelongsTo($this->organization, 'organization');
+        if (! $this->can('tasks:view:all')) {
+            $query->visibleByEmployee($this->user);
+        }
+
+        return $query;
     }
 
     /**
@@ -69,7 +109,9 @@ class ToolContext
             return [];
         }
 
-        return $this->tasks[$projectId] ??= collect($this->listOrNothing('tasks', ['project_id' => $projectId, 'done' => 'all']))->keyBy('id')->all();
+        return $this->tasks[$projectId] ??= ($this->visibleTaskQuery()?->where('project_id', $projectId)->orderBy('created_at', 'desc')->orderBy('id')->get() ?? collect())
+            ->mapWithKeys(fn (Task $task): array => [$task->getKey() => (new TaskResource($task))->toArray(request())])
+            ->all();
     }
 
     /**
@@ -79,7 +121,7 @@ class ToolContext
      */
     public function visibleTaskNames(): array
     {
-        return $this->allTasks ??= collect($this->listOrNothing('tasks', ['done' => 'all']))->pluck('name', 'id')->all();
+        return $this->allTasks ??= $this->visibleTaskQuery()?->pluck('name', 'id')->all() ?? [];
     }
 
     /**
@@ -94,8 +136,8 @@ class ToolContext
         }
         $members = [$this->user->getKey() => ['id' => $this->member->getKey(), 'name' => $this->user->name]];
         if ($this->can('members:view')) {
-            foreach ($this->listOrNothing('members') as $member) {
-                $members[$member['user_id']] = ['id' => $member['id'], 'name' => $member['name']];
+            foreach (Member::query()->whereBelongsTo($this->organization, 'organization')->with('user')->get() as $member) {
+                $members[$member->user_id] = ['id' => $member->getKey(), 'name' => $member->user->name];
             }
         }
 
@@ -109,22 +151,18 @@ class ToolContext
      */
     public function clientNames(): array
     {
-        return $this->clients ??= collect($this->listOrNothing('clients', ['archived' => 'all']))->pluck('name', 'id')->all();
-    }
-
-    /**
-     * @param  array<string, mixed>  $query
-     * @return array<int, array<string, mixed>>
-     */
-    private function listOrNothing(string $path, array $query = []): array
-    {
-        try {
-            return $this->api->all($this->path($path), $query);
-        } catch (ToolError $error) {
-            if (in_array($error->status, [403, 404], true)) {
-                return [];
-            }
-            throw $error;
+        if ($this->clients !== null) {
+            return $this->clients;
         }
+        if (! $this->can('clients:view')) {
+            return $this->clients = [];
+        }
+        // As ClientController::index
+        $query = Client::query()->whereBelongsTo($this->organization, 'organization');
+        if (! $this->can('clients:view:all')) {
+            $query->visibleByEmployee($this->user);
+        }
+
+        return $this->clients = $query->pluck('name', 'id')->all();
     }
 }
