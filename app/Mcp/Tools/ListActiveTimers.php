@@ -36,12 +36,25 @@ class ListActiveTimers extends McpTool
         if (! $everyone) {
             $query['member_id'] = $context->member->getKey();
         }
-        $entries = $context->api->send('GET', $context->path('time-entries'), $query)['data'] ?? [];
+        // Every running timer, up to 2,500, with the total so a cut is never silent
+        $entries = [];
+        $total = 0;
+        for ($offset = 0; $offset < 2500; $offset += 500) {
+            $body = $context->api->send('GET', $context->path('time-entries'), [...$query, 'offset' => $offset]);
+            $page = $body['data'] ?? [];
+            array_push($entries, ...$page);
+            $total = is_int($body['meta']['total'] ?? null) ? $body['meta']['total'] : count($entries);
+            if (count($page) < 500 || count($entries) >= $total) {
+                break;
+            }
+        }
         $names = Present::names($entries, $context);
         $now = now()->getTimestamp();
 
         return Response::json([
             'scope' => $everyone ? 'everyone' : 'yours',
+            'total' => $total,
+            'truncated' => $total > count($entries),
             'timers' => array_map(fn (array $entry): array => [
                 ...Present::timeEntry($entry, $names),
                 'running_hours' => isset($entry['start']) ? round(max(0, $now - (int) strtotime((string) $entry['start'])) / 3600, 4) : null,

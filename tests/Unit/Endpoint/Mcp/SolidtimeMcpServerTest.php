@@ -15,6 +15,7 @@ use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Passport\Passport;
 use Tests\TestCaseWithDatabase;
@@ -654,5 +655,37 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertNull($preview['after']['task_id']);
         $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'project_id' => $to->id, ...$preview['confirm_with']]);
         $this->assertNull($entry->refresh()->task_id);
+    }
+
+    public function test_a_start_left_to_the_confirmation_is_not_shown_as_fixed(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        Passport::actingAs($data->user);
+
+        $preview = $this->ok('start_timer');
+        $this->assertNull($preview['after']['start']);
+        $this->assertStringContainsString('when the change is confirmed', $preview['summary']);
+    }
+
+    public function test_active_timers_report_their_total(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        TimeEntry::factory()->forMember($data->member)->active()->create();
+        Passport::actingAs($data->user);
+
+        $timers = $this->ok('list_active_timers');
+        $this->assertSame(1, $timers['total']);
+        $this->assertFalse($timers['truncated']);
+    }
+
+    public function test_listing_projects_does_not_query_each_project(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        Project::factory()->forOrganization($data->organization)->count(40)->create();
+        Passport::actingAs($data->user);
+
+        DB::enableQueryLog();
+        $this->assertSame(40, $this->ok('list_projects')['count']);
+        $this->assertLessThan(40, count(DB::getQueryLog()));
     }
 }

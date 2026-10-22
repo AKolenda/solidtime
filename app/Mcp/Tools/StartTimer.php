@@ -53,10 +53,12 @@ class StartTimer extends WriteTool
         // Another member's running timer is checked only for someone who may see everyone's time
         $mayLook = $memberUserId === $context->user->getKey() || $context->can('time-entries:view:all');
         $running = is_string($memberUserId) && $mayLook ? $this->runningTimer($context, $memberUserId) : null;
-        $summary = 'Start a timer'.(isset($body['start']) ? '' : ' when the change is confirmed')
+        $summary = 'Start a timer'.(isset($input['start']) ? '' : ' when the change is confirmed')
             .($running !== null ? ' (a timer is already running for this person; it must be stopped first or this will be refused)' : '');
+        // Without a start the timer starts on confirmation, so the preview shows no fixed time
+        $preview = isset($input['start']) ? $body : [...$body, 'start' => null];
 
-        return new PlannedChange($summary, 'POST', $context->path('time-entries'), $body, null, $this->entryPreview($body, $context),
+        return new PlannedChange($summary, 'POST', $context->path('time-entries'), $body, null, $this->entryPreview($preview, $context),
             $this->presentEntry($context), $this->idempotencyHeaders($input['request_id'] ?? null));
     }
 }
