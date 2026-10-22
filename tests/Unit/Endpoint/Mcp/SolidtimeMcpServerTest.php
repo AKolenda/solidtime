@@ -751,16 +751,18 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->ok('update_project', [...$rename, ...$preview['confirm_with']]);
         $this->assertSame('Job 2', $project->fresh()?->name);
 
-        // A change while the preview reads the record is never bound to what it did not show
-        $changed = false;
-        Project::retrieved(function (Project $read) use (&$changed): void {
-            if (! $changed) {
-                $changed = true;
-                Project::query()->whereKey($read->getKey())->update(['name' => 'Job 3']);
+        // Changes while the preview reads the record (renamed, then renamed back) never bind it to what it did not show
+        $reads = 0;
+        Project::retrieved(function (Project $read) use (&$reads): void {
+            if (++$reads <= 2) {
+                Project::query()->whereKey($read->getKey())->update(['name' => $reads === 1 ? 'Job 3' : 'Job 2']);
             }
         });
-        $this->assertStringContainsString('changed while', $this->error('delete_project', ['project_id' => $project->id]));
-        $this->assertTrue($changed);
+        $deletion = $this->ok('delete_project', ['project_id' => $project->id]);
+        $this->assertSame(2, $reads);
+        $this->assertSame('Job 3', $deletion['before']['name']);
+        $this->assertStringContainsString('changed since the preview', $this->error('delete_project', ['project_id' => $project->id, ...$deletion['confirm_with']]));
+        $this->assertSame(1, Project::query()->count());
 
         $deletion = $this->ok('delete_task', ['task_id' => $task->id]);
         $task->update(['name' => 'Turning OP10']);
