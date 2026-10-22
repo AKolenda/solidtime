@@ -20,11 +20,10 @@ import {
 } from '@/Components/ui/alert-dialog';
 import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
 import { canUpdateTimeEntries } from '@/utils/permissions';
-import { useTimeEntriesMutations } from '@/utils/useTimeEntriesMutations';
+import { useNotificationsStore } from '@/utils/notification';
 import { useCurrentTimeEntryStore } from '@/utils/useCurrentTimeEntry';
 import { api } from '@/packages/api/src';
 import { LoadingSpinner } from '@/packages/ui/src';
-import { getDayJsInstance } from '@/packages/ui/src/utils/time';
 import { router } from '@inertiajs/vue3';
 
 // Get the organization ID using the utility function
@@ -57,7 +56,7 @@ const shownActivity = computed(() =>
 );
 
 const queryClient = useQueryClient();
-const { updateTimeEntry } = useTimeEntriesMutations();
+const { handleApiRequestNotifications } = useNotificationsStore();
 const stopCandidate = ref<TeamActivity | null>(null);
 const showStopDialog = ref(false);
 
@@ -71,11 +70,22 @@ async function stopTimer() {
     if (activity === null) {
         return;
     }
-    await updateTimeEntry({
-        id: activity.time_entry_id,
-        end: getDayJsInstance()().utc().format('YYYY-MM-DDTHH:mm:ss[Z]'),
-    });
-    await queryClient.invalidateQueries({ queryKey: ['latestTeamActivity'] });
+    // The server only stops the entry if it is still running, so a stale dialog can not overwrite a newer end
+    await handleApiRequestNotifications(
+        () =>
+            api.stopTimeEntry(undefined, {
+                params: {
+                    organization: organizationId.value!,
+                    timeEntry: activity.time_entry_id,
+                },
+            }),
+        'Timer stopped',
+        'Failed to stop the timer'
+    );
+    await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['latestTeamActivity'] }),
+        queryClient.invalidateQueries({ queryKey: ['timeEntries'] }),
+    ]);
     if (activity.member_id === getCurrentMembershipId()) {
         await useCurrentTimeEntryStore().fetchCurrentTimeEntry();
     }

@@ -4595,6 +4595,49 @@ Users with the permission &#x60;time-entries:view:own&#x60; can only use this en
         ],
     },
     {
+        method: 'post',
+        path: '/v1/organizations/:organization/time-entries/:timeEntry/stop',
+        alias: 'stopTimeEntry',
+        requestFormat: 'json',
+        parameters: [
+            {
+                name: 'organization',
+                type: 'Path',
+                schema: z.string(),
+            },
+            {
+                name: 'timeEntry',
+                type: 'Path',
+                schema: z.string(),
+            },
+        ],
+        response: z.object({ data: TimeEntryResource }).passthrough(),
+        errors: [
+            {
+                status: 400,
+                description: `API exception`,
+                schema: z
+                    .object({ error: z.boolean(), key: z.string(), message: z.string() })
+                    .passthrough(),
+            },
+            {
+                status: 401,
+                description: `Unauthenticated`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 403,
+                description: `Authorization error`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+            {
+                status: 404,
+                description: `Not found`,
+                schema: z.object({ message: z.string() }).passthrough(),
+            },
+        ],
+    },
+    {
         method: 'delete',
         path: '/v1/organizations/:organization/time-entries/:timeEntry',
         alias: 'deleteTimeEntry',

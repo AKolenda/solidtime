@@ -362,6 +362,8 @@ class DashboardService
                 $builder->where('role', '!=', Role::Placeholder->value);
             })
             ->orderBy('member_id')
+            // A running entry wins over later finished entries, which can exist if overlapping is allowed
+            ->orderByRaw('"end" is null desc')
             ->orderBy('start', 'desc')
             ->with([
                 'member' => [

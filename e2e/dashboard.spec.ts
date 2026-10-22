@@ -130,8 +130,8 @@ test("test that an admin can stop a team member's running timer from the Team Ac
     await Promise.all([
         page.waitForResponse(
             (response) =>
-                response.url().includes('/time-entries/' + timeEntryId) &&
-                response.request().method() === 'PUT' &&
+                response.url().includes('/time-entries/' + timeEntryId + '/stop') &&
+                response.request().method() === 'POST' &&
                 response.status() === 200
         ),
         page.getByRole('button', { name: 'Stop timer' }).click(),

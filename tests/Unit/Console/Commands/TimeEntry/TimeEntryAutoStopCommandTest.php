@@ -13,6 +13,7 @@ use App\Models\TimeEntry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use PHPUnit\Framework\Attributes\CoversClass;
 use Tests\TestCaseWithDatabase;
@@ -50,6 +51,41 @@ class TimeEntryAutoStopCommandTest extends TestCaseWithDatabase
         $this->assertSame("Stopping time entries that ran past the auto-stop limit...\n".
             'Stop time entry '.$timeEntry->getKey().' of user '.$user->user->getKey()." after 16 hours\n".
             "Finished stopping 1 time entries...\n", $output);
+    }
+
+    public function test_does_not_overwrite_a_time_entry_that_was_stopped_after_it_was_loaded(): void
+    {
+        // Arrange
+        $this->travelTo(Carbon::create(2024, 1, 2, 12, 0, 0, 'UTC'));
+        $user = $this->createUserWithPermission();
+        $user->organization->time_entry_auto_stop_hours = 16;
+        $user->organization->save();
+        $timeEntry = TimeEntry::factory()->forMember($user->member)->active()->create([
+            'start' => Carbon::now()->subHours(17),
+        ]);
+        // The user stops the entry right after the command loaded it
+        $stoppedByUser = false;
+        TimeEntry::retrieved(function (TimeEntry $retrieved) use ($timeEntry, &$stoppedByUser): void {
+            if ($stoppedByUser || $retrieved->isNot($timeEntry)) {
+                return;
+            }
+            $stoppedByUser = true;
+            DB::table('time_entries')->where('id', $timeEntry->getKey())->update([
+                'end' => Carbon::now()->subMinutes(30),
+            ]);
+        });
+
+        // Act
+        $exitCode = $this->withoutMockingConsoleOutput()->artisan('time-entry:auto-stop');
+
+        // Assert
+        $this->assertSame(Command::SUCCESS, $exitCode);
+        $this->assertTrue($stoppedByUser);
+        $timeEntry->refresh();
+        $this->assertSame('2024-01-02T11:30:00Z', $timeEntry->end?->toIso8601ZuluString());
+        $output = Artisan::output();
+        $this->assertSame("Stopping time entries that ran past the auto-stop limit...\n".
+            "Finished stopping 0 time entries...\n", $output);
     }
 
     public function test_does_not_stop_running_time_entries_below_the_limit(): void

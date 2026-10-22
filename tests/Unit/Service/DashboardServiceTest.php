@@ -542,6 +542,30 @@ class DashboardServiceTest extends TestCase
         ], $result);
     }
 
+    public function test_latest_team_activity_prefers_the_running_time_entry_over_a_later_finished_one(): void
+    {
+        // Arrange
+        $this->travelTo(Carbon::create(2024, 1, 1, 12, 0, 0, 'UTC'));
+        $organization = Organization::factory()->create();
+        $member = Member::factory()->forOrganization($organization)->create();
+        $runningTimeEntry = TimeEntry::factory()->forMember($member)->forOrganization($organization)->active()->create([
+            'start' => now()->subHours(3),
+        ]);
+        // Overlapping entries are possible if the organization does not prevent them
+        TimeEntry::factory()->forMember($member)->forOrganization($organization)->create([
+            'start' => now()->subHours(2),
+            'end' => now()->subHour(),
+        ]);
+
+        // Act
+        $result = $this->dashboardService->latestTeamActivity($organization);
+
+        // Assert
+        $this->assertCount(1, $result);
+        $this->assertSame($runningTimeEntry->getKey(), $result[0]['time_entry_id']);
+        $this->assertTrue($result[0]['status']);
+    }
+
     public function test_latest_tasks_returns_the_4_tasks_with_the_latest_time_entries(): void
     {
         // Arrange

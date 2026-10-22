@@ -11,6 +11,7 @@ use App\Models\TimeEntry;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class TimeEntryAutoStopCommand extends Command
 {
@@ -52,25 +53,43 @@ class TimeEntryAutoStopCommand extends Command
                 ->whereBelongsTo($organization, 'organization')
                 ->whereNull('end')
                 ->where('start', '<', Carbon::now()->subHours($hours))
-                ->with([
-                    'project',
-                    'task',
-                ])
                 ->chunkById(500, function (Collection $timeEntries) use ($dryRun, $hours, &$stopped): void {
                     /** @var Collection<int, TimeEntry> $timeEntries */
                     foreach ($timeEntries as $timeEntry) {
-                        $this->info('Stop time entry '.$timeEntry->getKey().' of user '.$timeEntry->user_id.' after '.$hours.' hours');
-                        $stopped++;
-                        if (! $dryRun) {
+                        if ($dryRun) {
+                            $this->info('Stop time entry '.$timeEntry->getKey().' of user '.$timeEntry->user_id.' after '.$hours.' hours');
+                            $stopped++;
+
+                            continue;
+                        }
+                        // Lock and re-read the entry, a user may have stopped or corrected it since the chunk was loaded
+                        $stoppedTimeEntry = DB::transaction(function () use ($timeEntry, $hours): ?TimeEntry {
+                            /** @var TimeEntry|null $lockedTimeEntry */
+                            $lockedTimeEntry = TimeEntry::query()
+                                ->whereKey($timeEntry->getKey())
+                                ->whereNull('end')
+                                ->where('start', '<', Carbon::now()->subHours($hours))
+                                ->lockForUpdate()
+                                ->first();
+                            if ($lockedTimeEntry === null) {
+                                return null;
+                            }
                             // End the entry at the limit, not at the time the command ran
-                            $timeEntry->end = $timeEntry->start->copy()->addHours($hours);
-                            $timeEntry->save();
-                            if ($timeEntry->project !== null) {
-                                RecalculateSpentTimeForProject::dispatch($timeEntry->project);
-                            }
-                            if ($timeEntry->task !== null) {
-                                RecalculateSpentTimeForTask::dispatch($timeEntry->task);
-                            }
+                            $lockedTimeEntry->end = $lockedTimeEntry->start->copy()->addHours($hours);
+                            $lockedTimeEntry->save();
+
+                            return $lockedTimeEntry;
+                        });
+                        if ($stoppedTimeEntry === null) {
+                            continue;
+                        }
+                        $this->info('Stop time entry '.$stoppedTimeEntry->getKey().' of user '.$stoppedTimeEntry->user_id.' after '.$hours.' hours');
+                        $stopped++;
+                        if ($stoppedTimeEntry->project !== null) {
+                            RecalculateSpentTimeForProject::dispatch($stoppedTimeEntry->project);
+                        }
+                        if ($stoppedTimeEntry->task !== null) {
+                            RecalculateSpentTimeForTask::dispatch($stoppedTimeEntry->task);
                         }
                     }
                 });

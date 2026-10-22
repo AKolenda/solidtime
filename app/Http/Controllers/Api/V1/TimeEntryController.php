@@ -10,6 +10,7 @@ use App\Exceptions\Api\FeatureIsNotAvailableInFreePlanApiException;
 use App\Exceptions\Api\OverlappingTimeEntryApiException;
 use App\Exceptions\Api\PdfRendererIsNotConfiguredException;
 use App\Exceptions\Api\TimeEntryCanNotBeRestartedApiException;
+use App\Exceptions\Api\TimeEntryIsNotRunningApiException;
 use App\Exceptions\Api\TimeEntryMemberCanNotBeChangedWhileRunningApiException;
 use App\Exceptions\Api\TimeEntryStillRunningApiException;
 use App\Http\Requests\V1\TimeEntry\TimeEntryAggregateExportRequest;
@@ -788,6 +789,51 @@ class TimeEntryController extends Controller
         }
         if ($task !== null && ($oldTask === null || $task->isNot($oldTask))) {
             RecalculateSpentTimeForTask::dispatch($task);
+        }
+
+        return new TimeEntryResource($timeEntry);
+    }
+
+    /**
+     * Stop a running time entry
+     *
+     * Ends the running time entry now. Fails if the time entry was already stopped, so a stop that was requested before someone else stopped or corrected the entry does not overwrite their end.
+     *
+     * @throws AuthorizationException|TimeEntryIsNotRunningApiException|OverlappingTimeEntryApiException
+     *
+     * @operationId stopTimeEntry
+     */
+    public function stop(Organization $organization, TimeEntry $timeEntry): JsonResource
+    {
+        $member = $this->member($organization);
+        if ($timeEntry->member_id === $member->getKey()) {
+            $this->checkPermission($organization, 'time-entries:update:own', $timeEntry);
+        } else {
+            $this->checkPermission($organization, 'time-entries:update:all', $timeEntry);
+        }
+
+        $timeEntry = DB::transaction(function () use ($organization, $timeEntry): TimeEntry {
+            /** @var TimeEntry $lockedTimeEntry */
+            $lockedTimeEntry = TimeEntry::query()
+                ->whereKey($timeEntry->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            if ($lockedTimeEntry->end !== null) {
+                throw new TimeEntryIsNotRunningApiException;
+            }
+            $end = Carbon::now()->startOfSecond();
+            $this->assertNoOverlap($organization, $lockedTimeEntry->member, $lockedTimeEntry->start, $end, $lockedTimeEntry);
+            $lockedTimeEntry->end = $end;
+            $lockedTimeEntry->save();
+
+            return $lockedTimeEntry;
+        });
+
+        if ($timeEntry->project !== null) {
+            RecalculateSpentTimeForProject::dispatch($timeEntry->project);
+        }
+        if ($timeEntry->task !== null) {
+            RecalculateSpentTimeForTask::dispatch($timeEntry->task);
         }
 
         return new TimeEntryResource($timeEntry);
