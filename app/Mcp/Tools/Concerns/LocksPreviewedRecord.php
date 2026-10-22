@@ -11,6 +11,7 @@ use App\Mcp\ToolError;
 use App\Models\Project;
 use App\Models\Task;
 use Closure;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 
@@ -34,7 +35,13 @@ trait LocksPreviewedRecord
     protected function bindToRecord(string $class, string $id, array $input, ToolContext $context, string $what, Closure $visible): array
     {
         $visible();
-        $query = fn () => $class::query()->whereBelongsTo($context->organization, 'organization')->whereKey($id);
+        // Read as the user may see it, as the visibility check did: a task only in a project they may see
+        $query = function () use ($class, $context, $id, $what): Builder {
+            $projects = $context->visibleProjectQuery();
+            $visible = $class === Project::class ? $projects : ($projects === null ? null : $context->visibleTaskQuery()?->whereIn('project_id', $projects->select('id')));
+
+            return ($visible ?? throw new ToolError(ucfirst($what).' not found, or not visible to you.', 404))->whereKey($id);
+        };
         // The preview and its version come from one read of the record, so the version is of what the preview shows
         $model = $query()->first() ?? throw new ToolError(ucfirst($what).' not found, or not visible to you.', 404);
         $record = $model instanceof Project ? (new ProjectResource($model, false))->toArray(request()) : (new TaskResource($model))->toArray(request());

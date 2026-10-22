@@ -773,6 +773,29 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertStringContainsString('not visible', $this->error('update_task', ['task_id' => $task->id, 'is_done' => true, ...$done['confirm_with']]));
     }
 
+    public function test_a_preview_never_shows_a_record_made_invisible_while_it_is_read(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $data->organization->update(['employees_can_manage_tasks' => true]);
+        $project = Project::factory()->forOrganization($data->organization)->isPublic()->create(['name' => 'Job 1']);
+        $task = Task::factory()->forProject($project)->forOrganization($data->organization)->create(['name' => 'Turning']);
+        Passport::actingAs($data->user);
+
+        // The project made private and the task renamed right after the visibility check read the task
+        // (the first read looks up only the task's project)
+        $reads = 0;
+        Task::retrieved(function () use (&$reads, $project, $task): void {
+            if (++$reads === 2) {
+                $project->update(['is_public' => false]);
+                Task::query()->whereKey($task->id)->update(['name' => 'Secret task']);
+            }
+        });
+        $error = $this->error('update_task', ['task_id' => $task->id, 'name' => 'Turning OP10']);
+        $this->assertStringContainsString('not visible', $error);
+        $this->assertStringNotContainsString('Secret', $error);
+        $this->assertSame(2, $reads);
+    }
+
     public function test_the_billable_default_shown_in_the_preview_is_kept_on_confirmation(): void
     {
         $data = $this->createUserWithRole(Role::Admin);

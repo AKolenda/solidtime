@@ -81,18 +81,32 @@ class ToolContext
         if ($this->projects !== null) {
             return $this->projects;
         }
-        if (! $this->can('projects:view')) {
+        $query = $this->visibleProjectQuery();
+        if ($query === null) {
             return $this->projects = [];
-        }
-        // As ProjectController::index
-        $query = Project::query()->whereBelongsTo($this->organization, 'organization');
-        if (! $this->can('projects:view:all')) {
-            $query->visibleByEmployee($this->user);
         }
 
         return $this->projects = $query->orderBy('created_at', 'desc')->orderBy('id')->get()
             ->mapWithKeys(fn (Project $project): array => [$project->getKey() => (new ProjectResource($project, false))->toArray(request())])
             ->all();
+    }
+
+    /**
+     * Projects the user may see, as ProjectController::index; null without permission to see projects.
+     *
+     * @return Builder<Project>|null
+     */
+    public function visibleProjectQuery(): ?Builder
+    {
+        if (! $this->can('projects:view')) {
+            return null;
+        }
+        $query = Project::query()->whereBelongsTo($this->organization, 'organization');
+        if (! $this->can('projects:view:all')) {
+            $query->visibleByEmployee($this->user);
+        }
+
+        return $query;
     }
 
     /**
