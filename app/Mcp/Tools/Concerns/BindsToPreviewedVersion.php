@@ -15,7 +15,7 @@ trait BindsToPreviewedVersion
 {
     protected function versionArgument(JsonSchema $schema): mixed
     {
-        return $schema->string()->max(200)->description('The expected_version the preview returned. Required with confirm, so only the previewed state of the entry is changed.');
+        return $schema->string()->max(200)->description('The expected_version the preview returned. Required with confirm, so only the previewed state is changed.');
     }
 
     /**

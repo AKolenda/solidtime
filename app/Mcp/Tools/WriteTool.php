@@ -8,6 +8,7 @@ use App\Mcp\PlannedChange;
 use App\Mcp\ToolContext;
 use App\Mcp\ToolError;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\DB;
 use Laravel\Mcp\Response;
 
 /**
@@ -71,7 +72,13 @@ abstract class WriteTool extends McpTool
             ]);
         }
 
-        $body = $context->api->send($change->method, $change->path, $change->body, $change->headers);
+        $send = fn (): array => $context->api->send($change->method, $change->path, $change->body, $change->headers);
+        // The API runs in this process on the same connection, so the guard's row lock holds until the change is made
+        $body = $change->guard === null ? $send() : DB::transaction(function () use ($change, $send): array {
+            ($change->guard)();
+
+            return $send();
+        });
 
         return Response::json([
             'applied' => true,

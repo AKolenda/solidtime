@@ -9,7 +9,9 @@ use App\Mcp\Present;
 use App\Mcp\ToolContext;
 use App\Mcp\ToolError;
 use App\Mcp\Tools\Concerns\FindsRecords;
+use App\Mcp\Tools\Concerns\LocksPreviewedRecord;
 use App\Mcp\Tools\Concerns\WritesProjects;
+use App\Models\Project;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 
@@ -17,6 +19,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 class UpdateProject extends WriteTool
 {
     use FindsRecords;
+    use LocksPreviewedRecord;
     use WritesProjects;
 
     protected string $name = 'update_project';
@@ -27,6 +30,7 @@ class UpdateProject extends WriteTool
     {
         return [
             'project_id' => $schema->string()->format('uuid')->required(),
+            'expected_version' => $this->versionArgument($schema),
             'name' => $schema->string()->min(1)->max(255),
             ...$this->projectArguments($schema),
             'is_archived' => $schema->boolean()->description('Archive (true) or restore (false) the project.'),
@@ -37,6 +41,7 @@ class UpdateProject extends WriteTool
     {
         return [
             'project_id' => ['required', 'string', 'uuid'],
+            'expected_version' => $this->versionRule(),
             'name' => ['sometimes', 'string', 'min:1', 'max:255'],
             ...$this->projectRules(),
             'is_archived' => ['sometimes', 'boolean:strict'],
@@ -46,6 +51,7 @@ class UpdateProject extends WriteTool
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
         $project = $this->findProject($context, $input['project_id']);
+        [$confirmWith, $guard] = $this->bindToRecord(Project::class, $project['id'], $input, $context, 'project');
         $changes = array_intersect_key($input, array_flip(['name', 'color', 'client_id', 'is_billable', 'is_public', 'is_archived']));
         if (array_key_exists('estimated_hours', $input)) {
             $changes['estimated_time'] = $this->seconds($input['estimated_hours']);
@@ -63,6 +69,6 @@ class UpdateProject extends WriteTool
         ];
 
         return new PlannedChange('Change a project', 'PUT', $context->path('projects/'.$project['id']), $body,
-            Present::project($project), Present::project([...$project, ...$changes]), $this->presentProject());
+            Present::project($project), Present::project([...$project, ...$changes]), $this->presentProject(), [], $confirmWith, $guard);
     }
 }

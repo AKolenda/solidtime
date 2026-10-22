@@ -8,7 +8,9 @@ use App\Mcp\PlannedChange;
 use App\Mcp\Present;
 use App\Mcp\ToolContext;
 use App\Mcp\Tools\Concerns\FindsRecords;
+use App\Mcp\Tools\Concerns\LocksPreviewedRecord;
 use App\Mcp\Tools\Concerns\WritesProjects;
+use App\Models\Task;
 use App\Models\TimeEntry;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
@@ -17,6 +19,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 class DeleteTask extends WriteTool
 {
     use FindsRecords;
+    use LocksPreviewedRecord;
     use WritesProjects;
 
     protected string $name = 'delete_task';
@@ -27,6 +30,7 @@ class DeleteTask extends WriteTool
     {
         return [
             'task_id' => $schema->string()->format('uuid')->required(),
+            'expected_version' => $this->versionArgument($schema),
         ];
     }
 
@@ -34,12 +38,14 @@ class DeleteTask extends WriteTool
     {
         return [
             'task_id' => ['required', 'string', 'uuid'],
+            'expected_version' => $this->versionRule(),
         ];
     }
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
         $task = $this->findTask($context, $input['task_id']);
+        [$confirmWith, $guard] = $this->bindToRecord(Task::class, $task['id'], $input, $context, 'task');
         // Counting everyone's entries is only for someone who may see them
         $entries = $context->can('time-entries:view:all')
             ? TimeEntry::query()->whereBelongsTo($context->organization, 'organization')->where('task_id', $task['id'])->count() : null;
@@ -47,6 +53,6 @@ class DeleteTask extends WriteTool
             : ($entries > 0 ? " ({$entries} time entries use it, so SolidTime will refuse; mark it done instead)" : '');
 
         return new PlannedChange('Delete a task'.$inUse,
-            'DELETE', $context->path('tasks/'.$task['id']), [], Present::task($task), null, fn (): array => ['deleted' => $task['id']]);
+            'DELETE', $context->path('tasks/'.$task['id']), [], Present::task($task), null, fn (): array => ['deleted' => $task['id']], [], $confirmWith, $guard);
     }
 }

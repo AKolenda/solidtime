@@ -16,6 +16,7 @@ class PlannedChange
      * @param  array<string, mixed>|null  $after  the record as it will be, null for a deletion
      * @param  Closure(mixed): mixed  $present  shapes the API's answer for the client
      * @param  array<string, mixed>  $confirmWith  arguments the confirming call must add, naming the previewed record
+     * @param  (Closure(): void)|null  $guard  run in the change's transaction just before it, refusing it if the record changed
      */
     public function __construct(
         public readonly string $summary,
@@ -27,5 +28,6 @@ class PlannedChange
         public readonly Closure $present,
         public readonly array $headers = [],
         public readonly array $confirmWith = [],
+        public readonly ?Closure $guard = null,
     ) {}
 }

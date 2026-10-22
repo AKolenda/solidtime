@@ -324,20 +324,20 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $task = $this->ok('create_task', ['project_id' => $project['id'], 'name' => 'Turning', 'estimated_hours' => 4, 'confirm' => true])['result'];
         $this->assertEquals(4.0, $task['estimated_hours']);
 
-        $this->ok('update_project', ['project_id' => $project['id'], 'estimated_hours' => 15, 'confirm' => true]);
+        $this->confirmed('update_project', ['project_id' => $project['id'], 'estimated_hours' => 15]);
         $stored = Project::query()->findOrFail($project['id']);
         $this->assertSame(54000, $stored->estimated_time);
         $this->assertSame(9000, $stored->billable_rate);
         $this->assertTrue($stored->is_billable);
         $this->assertSame('Job 7781', $stored->name);
 
-        $this->ok('update_task', ['task_id' => $task['id'], 'is_done' => true, 'confirm' => true]);
+        $this->confirmed('update_task', ['task_id' => $task['id'], 'is_done' => true]);
         $this->assertTrue(Task::query()->findOrFail($task['id'])->is_done);
 
         $this->assertStringContainsString('1 tasks', $this->ok('delete_project', ['project_id' => $project['id']])['summary']);
-        $this->error('delete_project', ['project_id' => $project['id'], 'confirm' => true]);
-        $this->ok('delete_task', ['task_id' => $task['id'], 'confirm' => true]);
-        $this->ok('delete_project', ['project_id' => $project['id'], 'confirm' => true]);
+        $this->error('delete_project', ['project_id' => $project['id'], ...$this->ok('delete_project', ['project_id' => $project['id']])['confirm_with']]);
+        $this->confirmed('delete_task', ['task_id' => $task['id']]);
+        $this->confirmed('delete_project', ['project_id' => $project['id']]);
         $this->assertSame(0, Project::query()->count());
     }
 
@@ -407,9 +407,9 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
 
         $this->assertSame('Job 7781', $this->ok('get_project', ['project_id' => $project->id])['project']['name']);
         $task = $this->ok('create_task', ['project_id' => $project->id, 'name' => 'Turning', 'confirm' => true])['result'];
-        $this->ok('update_task', ['task_id' => $task['id'], 'name' => 'Turning OP10', 'confirm' => true]);
+        $this->confirmed('update_task', ['task_id' => $task['id'], 'name' => 'Turning OP10']);
         $this->assertSame('Turning OP10', Task::query()->findOrFail($task['id'])->name);
-        $this->ok('delete_task', ['task_id' => $task['id'], 'confirm' => true]);
+        $this->confirmed('delete_task', ['task_id' => $task['id']]);
         $this->assertSame(0, Task::query()->count());
     }
 
@@ -729,6 +729,35 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertStringContainsString('another project', $this->error('update_time_entry', ['time_entry_id' => $entry->id, 'task_id' => $task->id]));
         $this->assertStringContainsString('needs its project', $this->error('update_time_entry', ['time_entry_id' => $entry->id, 'project_id' => null, 'task_id' => $task->id]));
         $this->assertSame($other->id, $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'project_id' => $other->id, 'task_id' => $task->id])['after']['project_id']);
+    }
+
+    public function test_project_and_task_changes_are_confirmed_only_against_the_previewed_record(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $project = Project::factory()->forOrganization($data->organization)->create(['name' => 'Job 1']);
+        $task = Task::factory()->forProject($project)->forOrganization($data->organization)->create(['name' => 'Turning']);
+        Passport::actingAs($data->user);
+
+        $rename = ['project_id' => $project->id, 'name' => 'Job 2'];
+        $preview = $this->ok('update_project', $rename);
+        $this->assertStringContainsString('expected_version', $this->error('update_project', [...$rename, 'confirm' => true]));
+        $project->update(['name' => 'Job 1b']);
+        $this->assertStringContainsString('changed since the preview', $this->error('update_project', [...$rename, ...$preview['confirm_with']]));
+        $this->assertSame('Job 1b', $project->fresh()?->name);
+
+        // Recalculating the spent time is not a change to the record
+        $preview = $this->ok('update_project', $rename);
+        Project::query()->whereKey($project->id)->update(['spent_time' => 3600, 'updated_at' => now()->addMinute()]);
+        $this->ok('update_project', [...$rename, ...$preview['confirm_with']]);
+        $this->assertSame('Job 2', $project->fresh()?->name);
+
+        $deletion = $this->ok('delete_task', ['task_id' => $task->id]);
+        $task->update(['name' => 'Turning OP10']);
+        $this->assertStringContainsString('changed since the preview', $this->error('delete_task', ['task_id' => $task->id, ...$deletion['confirm_with']]));
+        $this->assertSame(1, Task::query()->count());
+        $done = $this->ok('update_task', ['task_id' => $task->id, 'is_done' => true]);
+        $this->confirmed('delete_task', ['task_id' => $task->id]);
+        $this->assertStringContainsString('not visible', $this->error('update_task', ['task_id' => $task->id, 'is_done' => true, ...$done['confirm_with']]));
     }
 
     public function test_the_billable_default_shown_in_the_preview_is_kept_on_confirmation(): void

@@ -70,9 +70,12 @@ destructive. Stop and update tools carry `idempotentHint`.
 
 The preview's `confirm_with` lists what the confirming call must add. For
 `update_time_entry`, `stop_timer` and `delete_time_entry` that is the entry's `expected_version`,
-and for a `stop_timer` without `time_entry_id` also the timer it found. So a
-confirmation changes only the state the user saw, and an entry changed since
-the preview is refused (412).
+and for a `stop_timer` without `time_entry_id` also the timer it found. The
+project and task updates and deletions return the record's `expected_version`
+too; the confirmation checks it with the record locked until the change is
+made. A billable value the preview worked out from the project is returned as
+`billable`. So a confirmation changes only the state the user saw, and a record
+changed since the preview is refused (412).
 
 Creations accept an optional `request_id`. It is sent as the API's
 `Idempotency-Key`, so a retried call returns the first result.

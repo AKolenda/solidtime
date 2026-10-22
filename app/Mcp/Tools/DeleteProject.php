@@ -8,7 +8,9 @@ use App\Mcp\PlannedChange;
 use App\Mcp\Present;
 use App\Mcp\ToolContext;
 use App\Mcp\Tools\Concerns\FindsRecords;
+use App\Mcp\Tools\Concerns\LocksPreviewedRecord;
 use App\Mcp\Tools\Concerns\WritesProjects;
+use App\Models\Project;
 use App\Models\TimeEntry;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
@@ -17,6 +19,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsDestructive;
 class DeleteProject extends WriteTool
 {
     use FindsRecords;
+    use LocksPreviewedRecord;
     use WritesProjects;
 
     protected string $name = 'delete_project';
@@ -27,6 +30,7 @@ class DeleteProject extends WriteTool
     {
         return [
             'project_id' => $schema->string()->format('uuid')->required(),
+            'expected_version' => $this->versionArgument($schema),
         ];
     }
 
@@ -34,12 +38,14 @@ class DeleteProject extends WriteTool
     {
         return [
             'project_id' => ['required', 'string', 'uuid'],
+            'expected_version' => $this->versionRule(),
         ];
     }
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
         $project = $this->findProject($context, $input['project_id']);
+        [$confirmWith, $guard] = $this->bindToRecord(Project::class, $project['id'], $input, $context, 'project');
         // Counting everyone's entries is only for someone who may see them
         $entries = $context->can('time-entries:view:all')
             ? TimeEntry::query()->whereBelongsTo($context->organization, 'organization')->where('project_id', $project['id'])->count() : null;
@@ -48,6 +54,6 @@ class DeleteProject extends WriteTool
             : ($entries === null ? ' (SolidTime refuses while time entries use it)' : '');
 
         return new PlannedChange('Delete a project'.$inUse,
-            'DELETE', $context->path('projects/'.$project['id']), [], Present::project($project), null, fn (): array => ['deleted' => $project['id']]);
+            'DELETE', $context->path('projects/'.$project['id']), [], Present::project($project), null, fn (): array => ['deleted' => $project['id']], [], $confirmWith, $guard);
     }
 }
