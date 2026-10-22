@@ -6,6 +6,7 @@ namespace App\Mcp\Tools\Concerns;
 
 use App\Mcp\Present;
 use App\Mcp\ToolContext;
+use App\Mcp\ToolError;
 use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 
@@ -52,6 +53,13 @@ trait WritesTimeEntries
     protected function newEntryBody(array $input, ToolContext $context, string $start, ?string $end): array
     {
         $projectId = $input['project_id'] ?? null;
+        // A task belongs to one project, which the API requires alongside it: a task alone brings its project
+        if ($projectId === null && isset($input['task_id'])) {
+            $projectId = $context->visibleTaskQuery()?->whereKey($input['task_id'])->value('project_id');
+            if (! is_string($projectId)) {
+                throw new ToolError('Task not found, or not visible to you.', 404);
+            }
+        }
         $billable = $input['billable'] ?? ($context->canUseBillableRates() && (bool) ($context->visibleProjects()[$projectId ?? '']['is_billable'] ?? false));
 
         return [

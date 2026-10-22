@@ -700,4 +700,18 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertNull($preview['after']['hours']);
         $this->assertStringContainsString('when the change is confirmed', $preview['summary']);
     }
+
+    public function test_a_new_entry_with_only_a_task_takes_the_task_project(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        $task = Task::factory()->forProject($project)->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        $preview = $this->ok('create_time_entry', ['task_id' => $task->id, 'start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T09:00:00Z']);
+        $this->assertSame($project->id, $preview['after']['project_id']);
+        $this->confirmed('create_time_entry', ['task_id' => $task->id, 'start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T09:00:00Z']);
+        $this->assertSame($project->id, TimeEntry::query()->sole()->project_id);
+        $this->assertStringContainsString('not visible', $this->error('start_timer', ['task_id' => '00000000-0000-4000-8000-000000000000']));
+    }
 }
