@@ -96,6 +96,51 @@ test('test that stopping timer refreshes dashboard data', async ({ page }) => {
     await assertThatTimerIsStopped(page);
 });
 
+test("test that an admin can stop a team member's running timer from the Team Activity card", async ({
+    page,
+    ctx,
+    employee,
+}) => {
+    const start = new Date();
+    start.setHours(start.getHours() - 2);
+    const createResponse = await ctx.request.post(
+        `${PLAYWRIGHT_BASE_URL}/api/v1/organizations/${ctx.orgId}/time-entries`,
+        {
+            data: {
+                member_id: employee.memberId,
+                start: start.toISOString().replace(/\.\d{3}Z$/, 'Z'),
+                description: 'Deburr',
+                billable: false,
+            },
+        }
+    );
+    expect(createResponse.status()).toBe(201);
+    const timeEntryId = (await createResponse.json()).data.id;
+    const membersResponse = await ctx.request.get(
+        `${PLAYWRIGHT_BASE_URL}/api/v1/organizations/${ctx.orgId}/members`
+    );
+    const employeeName = (await membersResponse.json()).data.find(
+        (member: { id: string; name: string }) => member.id === employee.memberId
+    ).name;
+
+    await goToDashboard(page);
+    await expect(page.getByRole('tab', { name: /Working · 1/ })).toBeVisible();
+    await page.getByRole('button', { name: 'Actions for ' + employeeName }).click();
+    await page.getByRole('menuitem', { name: 'Stop timer of ' + employeeName }).click();
+    await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/time-entries/' + timeEntryId) &&
+                response.request().method() === 'PUT' &&
+                response.status() === 200
+        ),
+        page.getByRole('button', { name: 'Stop timer' }).click(),
+    ]);
+
+    await expect(page.getByRole('tab', { name: /Working · 0/ })).toBeVisible();
+    await expect(page.getByText('Nobody is clocked in right now.')).toBeVisible();
+});
+
 // =============================================
 // Employee Permission Tests
 // =============================================

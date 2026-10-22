@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Enums\Role;
 use App\Enums\TimeEntryType;
 use App\Enums\Weekday;
+use App\Models\Member;
 use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
@@ -346,26 +348,33 @@ class DashboardService
     }
 
     /**
-     * Rhe 4 most recently active members of your team with member_id, name, description of the latest time entry, time_entry_id, task_id and a boolean status if the team member is currently working
+     * The latest time entry of every member of your team (except placeholders), members that are currently working first, then the most recently active
      *
-     * @return array<int, array{member_id: string, name: string, description: string|null, time_entry_id: string, task_id: string|null, status: bool }>
+     * @return array<int, array{member_id: string, name: string, description: string|null, time_entry_id: string, task_id: string|null, task_name: string|null, project_id: string|null, project_name: string|null, project_color: string|null, start: string, end: string|null, status: bool }>
      */
     public function latestTeamActivity(Organization $organization): array
     {
         $timeEntries = TimeEntry::query()
-            ->select(DB::raw('distinct on (member_id) member_id, description, id, task_id, start, "end"'))
+            ->select(DB::raw('distinct on (member_id) member_id, description, id, task_id, project_id, start, "end"'))
             ->whereBelongsTo($organization, 'organization')
+            ->whereHas('member', function (Builder $builder): void {
+                /** @var Builder<Member> $builder */
+                $builder->where('role', '!=', Role::Placeholder->value);
+            })
             ->orderBy('member_id')
             ->orderBy('start', 'desc')
-            // Note: limit here does not work because of the distinct on
             ->with([
                 'member' => [
                     'user',
                 ],
+                'project',
+                'task',
             ])
             ->get()
-            ->sortByDesc('start')
-            ->slice(0, 4);
+            ->sortBy([
+                fn (TimeEntry $a, TimeEntry $b): int => ($a->end === null ? 0 : 1) <=> ($b->end === null ? 0 : 1),
+                fn (TimeEntry $a, TimeEntry $b): int => ($b->end ?? $b->start) <=> ($a->end ?? $a->start),
+            ]);
 
         $response = [];
 
@@ -376,6 +385,12 @@ class DashboardService
                 'description' => $timeEntry->description,
                 'time_entry_id' => $timeEntry->id,
                 'task_id' => $timeEntry->task_id,
+                'task_name' => $timeEntry->task?->name,
+                'project_id' => $timeEntry->project_id,
+                'project_name' => $timeEntry->project?->name,
+                'project_color' => $timeEntry->project?->color,
+                'start' => $timeEntry->start->toIso8601ZuluString(),
+                'end' => $timeEntry->end?->toIso8601ZuluString(),
                 'status' => $timeEntry->end === null,
             ];
         }

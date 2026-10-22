@@ -343,6 +343,7 @@ const OrganizationResource = z
         employees_can_manage_tasks: z.boolean(),
         prevent_overlapping_time_entries: z.boolean(),
         breaks_enabled: z.boolean(),
+        time_entry_auto_stop_hours: z.union([z.number(), z.null()]),
         shop_report_enabled: z.boolean(),
         shop_report_logo: z.union([z.string(), z.null()]),
         currency: z.string(),
@@ -363,6 +364,7 @@ const OrganizationUpdateRequest = z
         employees_can_manage_tasks: z.boolean(),
         prevent_overlapping_time_entries: z.boolean(),
         breaks_enabled: z.boolean(),
+        time_entry_auto_stop_hours: z.union([z.number().int().gte(1).lte(168), z.null()]),
         shop_report_enabled: z.boolean(),
         shop_report_logo: z.union([z.string(), z.null()]),
         number_format: NumberFormat,
@@ -1214,6 +1216,12 @@ const endpoints = makeApi([
                     description: z.union([z.string(), z.null()]),
                     time_entry_id: z.string(),
                     task_id: z.union([z.string(), z.null()]),
+                    task_name: z.union([z.string(), z.null()]),
+                    project_id: z.union([z.string(), z.null()]),
+                    project_name: z.union([z.string(), z.null()]),
+                    project_color: z.union([z.string(), z.null()]),
+                    start: z.string(),
+                    end: z.union([z.string(), z.null()]),
                     status: z.boolean(),
                 })
                 .passthrough()
