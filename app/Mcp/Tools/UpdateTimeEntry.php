@@ -48,6 +48,13 @@ class UpdateTimeEntry extends WriteTool
     {
         [$entry, $etag] = $this->findVersionedTimeEntry($context, $input['time_entry_id']);
         $body = array_intersect_key($input, array_flip(['member_id', 'project_id', 'task_id', 'description', 'billable', 'tags']));
+        // The API checks a task against the project sent with it: a new task alone keeps the entry's project
+        if (isset($body['task_id']) && ! array_key_exists('project_id', $body)) {
+            if (($entry['project_id'] ?? null) === null) {
+                throw new ToolError('A task needs its project; pass project_id too.');
+            }
+            $body['project_id'] = $entry['project_id'];
+        }
         foreach (['start', 'end'] as $key) {
             if (isset($input[$key])) {
                 $body[$key] = $this->utc($input[$key]);

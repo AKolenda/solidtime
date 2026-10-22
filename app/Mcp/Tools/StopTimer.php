@@ -42,6 +42,11 @@ class StopTimer extends WriteTool
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
+        // Without an id the preview finds the running timer; the confirmation must then name the
+        // timer that was previewed, so a timer started in between is never stopped by mistake.
+        if (! isset($input['time_entry_id']) && ($input['confirm'] ?? null) === true) {
+            throw new ToolError('Confirm with the time_entry_id from the preview, so the timer the user approved is the one stopped.');
+        }
         $id = $input['time_entry_id'] ?? $this->runningTimerId($context);
         if ($id === null) {
             throw new ToolError('You have no running timer in this organization.', 404);
@@ -54,6 +59,6 @@ class StopTimer extends WriteTool
 
         return new PlannedChange('Stop the running timer', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
             $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context),
-            $etag === null ? [] : ['If-Match' => $etag]);
+            $etag === null ? [] : ['If-Match' => $etag], isset($input['time_entry_id']) ? [] : ['time_entry_id' => $entry['id']]);
     }
 }

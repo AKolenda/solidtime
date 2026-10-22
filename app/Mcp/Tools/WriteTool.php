@@ -65,7 +65,8 @@ abstract class WriteTool extends McpTool
                 'summary' => $change->summary,
                 'before' => $change->before,
                 'after' => $change->after,
-                'next_step' => 'Nothing has changed. Show the user this change. Only if they approve it, call '.$this->name().' again with the same arguments plus confirm: true.',
+                'next_step' => 'Nothing has changed. Show the user this change. Only if they approve it, call '.$this->name().' again with the same arguments plus '
+                    .json_encode([...$change->confirmWith, 'confirm' => true], JSON_UNESCAPED_SLASHES).'.',
             ]);
         }
 

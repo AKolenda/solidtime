@@ -251,7 +251,9 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertEquals(2.5, $preview['after']['hours']);
         $this->assertNull($running->refresh()->end);
 
-        $this->ok('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', 'confirm' => true]);
+        $this->assertStringContainsString('"time_entry_id":"'.$running->id.'"', $preview['next_step']);
+        $this->assertStringContainsString('time_entry_id from the preview', $this->error('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', 'confirm' => true]));
+        $this->ok('stop_timer', ['end' => '2026-10-21T09:30:00-06:00', 'time_entry_id' => $running->id, 'confirm' => true]);
         $this->assertSame('2026-10-21 15:30:00', $running->refresh()->end->toDateTimeString());
         $this->assertSame('You have no running timer in this organization.', $this->error('stop_timer'));
     }
@@ -521,5 +523,49 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertStringContainsString('billable', $this->error('create_project', ['name' => 'Job 2', 'is_billable' => true]));
         $this->assertFalse($this->ok('start_timer', ['project_id' => $project->id])['after']['billable']);
         $this->assertSame(1, Project::query()->count());
+    }
+
+    public function test_a_confirmed_stop_never_reaches_a_timer_started_after_the_preview(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        $first = TimeEntry::factory()->forMember($data->member)->create(['start' => Carbon::parse('2026-10-21 13:00:00'), 'end' => null]);
+        Passport::actingAs($data->user);
+
+        $this->ok('stop_timer');
+        $first->update(['end' => Carbon::parse('2026-10-21 14:00:00')]);
+        $second = TimeEntry::factory()->forMember($data->member)->create(['start' => Carbon::parse('2026-10-21 14:05:00'), 'end' => null]);
+
+        $this->error('stop_timer', ['time_entry_id' => $first->id, 'confirm' => true]);
+        $this->assertNull($second->refresh()->end);
+    }
+
+    public function test_changing_only_the_task_keeps_the_project(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        [$turning, $milling] = Task::factory()->forProject($project)->forOrganization($data->organization)->count(2)->create();
+        $entry = TimeEntry::factory()->forMember($data->member)->forProject($project)->forTask($turning)->create();
+        $loose = TimeEntry::factory()->forMember($data->member)->create(['project_id' => null, 'task_id' => null]);
+        Passport::actingAs($data->user);
+
+        $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'task_id' => $milling->id, 'confirm' => true]);
+        $this->assertSame($milling->id, $entry->refresh()->task_id);
+        $this->assertStringContainsString('project_id too', $this->error('update_time_entry', ['time_entry_id' => $loose->id, 'task_id' => $milling->id]));
+    }
+
+    public function test_entries_name_their_tasks_across_many_projects(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        foreach (range(1, 27) as $index) {
+            $project = Project::factory()->forOrganization($data->organization)->create();
+            $task = Task::factory()->forProject($project)->forOrganization($data->organization)->create(['name' => 'Op '.$index]);
+            TimeEntry::factory()->forMember($data->member)->forProject($project)->forTask($task)
+                ->startWithDuration(Carbon::parse('2026-10-01 08:00:00')->addHours($index), 600)->create();
+        }
+        Passport::actingAs($data->user);
+
+        $entries = $this->ok('list_time_entries', ['limit' => 100])['entries'];
+        $this->assertCount(27, $entries);
+        $this->assertSame([], array_filter($entries, fn (array $entry): bool => $entry['task'] === null));
     }
 }

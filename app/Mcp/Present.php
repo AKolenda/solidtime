@@ -63,12 +63,8 @@ class Present
     {
         $projectIds = array_values(array_unique(array_filter(array_column($entries, 'project_id'), 'is_string')));
         $projects = array_intersect_key($context->visibleProjects(), array_flip($projectIds));
-        $tasks = [];
-        foreach (array_slice(array_keys($projects), 0, 25) as $projectId) {
-            foreach ($context->visibleTasks($projectId) as $id => $task) {
-                $tasks[$id] = $task['name'];
-            }
-        }
+        $taskIds = array_values(array_unique(array_filter(array_column($entries, 'task_id'), 'is_string')));
+        $tasks = $taskIds === [] ? [] : ($context->visibleTaskQuery()?->whereIn('id', $taskIds)->pluck('name', 'id')->all() ?? []);
 
         return [
             'projects' => array_map(fn (array $project): string => $project['name'], $projects),
