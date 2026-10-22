@@ -43,6 +43,10 @@ class ApiCreationIdempotency
             if ($replay !== null) {
                 return $replay;
             }
+            // A client recovering a request whose answer it lost asks only for the earlier result
+            if ($request->hasHeader('Idempotency-Replay-Only')) {
+                abort(404, 'Nothing was created with this Idempotency-Key.', ['X-Solidtime-Idempotency' => 'none']);
+            }
 
             $validated = Validator::make($request->all(), $request->creationRules())->validate();
             $response = $create($validated)->response();

@@ -102,6 +102,10 @@ pruned after `MCP_AUDIT_RETENTION_DAYS` (default 180) by the daily
   (`ApiCreationIdempotency`).
 - With a key, a timer (`end` null) may leave out `start`. It then starts when
   it is created, and a retry sends the same body, so it replays that timer.
+- With `Idempotency-Replay-Only` as well, a keyed creation returns only an
+  earlier result for that key and creates nothing (404 with
+  `X-Solidtime-Idempotency: none`). A client that lost an answer uses it to
+  recover a write it can no longer prepare afresh.
 - A key reused with another body answers 409 with
   `X-Solidtime-Idempotency: mismatch`. Keys are unique per change, so this
   means the key's first request already succeeded.

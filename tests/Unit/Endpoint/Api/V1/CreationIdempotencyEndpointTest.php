@@ -188,4 +188,18 @@ class CreationIdempotencyEndpointTest extends ApiEndpointTestAbstract
         $this->assertDatabaseCount('time_entries', 2);
         $this->assertDatabaseCount('api_creation_operations', 0);
     }
+
+    public function test_replay_only_returns_an_earlier_creation_and_never_creates(): void
+    {
+        $data = $this->createUserWithPermission(['time-entries:create:own']);
+        Passport::actingAs($data->user);
+        $url = route('api.v1.time-entries.store-idempotent', [$data->organization->id]);
+        $payload = ['member_id' => $data->member->id, 'start' => '2026-10-01T08:00:00Z', 'end' => '2026-10-01T09:00:00Z', 'billable' => false];
+
+        $this->postJson($url, $payload, [...$this->headers, 'Idempotency-Replay-Only' => '1'])->assertNotFound()->assertHeader('X-Solidtime-Idempotency', 'none');
+        $this->assertDatabaseCount('time_entries', 0);
+        $first = $this->postJson($url, $payload, $this->headers)->assertCreated();
+        $this->assertSame($first->json(), $this->postJson($url, $payload, [...$this->headers, 'Idempotency-Replay-Only' => '1'])->assertCreated()->json());
+        $this->assertDatabaseCount('time_entries', 1);
+    }
 }
