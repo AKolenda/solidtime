@@ -49,7 +49,20 @@ class RestrictMcpToInternalNetwork
             array_push($addresses, ...$matches[1]);
         }
 
-        // An address with a port ("10.0.0.5:1234") counts as its address
-        return array_map(fn (string $ip): string => preg_match('/\A[\d.]+:\d+\z/', $ip) ? explode(':', $ip)[0] : $ip, $addresses);
+        return array_map($this->address(...), $addresses);
+    }
+
+    /**
+     * The address itself: "10.0.0.5:1234" is 10.0.0.5, "[fd00::5]" and "[fd00::5]:443" are
+     * fd00::5, and a bare IPv6 address stays as it is.
+     */
+    private function address(string $value): string
+    {
+        $value = trim($value, ' 	"');
+        if (preg_match('/\A\[([^\]]+)\](?::\d+)?\z/', $value, $match)) {
+            return $match[1];
+        }
+
+        return preg_match('/\A([\d.]+):\d+\z/', $value, $match) ? $match[1] : $value;
     }
 }

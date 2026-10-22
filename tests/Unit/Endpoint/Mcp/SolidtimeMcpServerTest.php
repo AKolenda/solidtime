@@ -493,6 +493,21 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->callTool('get_context')->assertNotFound();
     }
 
+    public function test_forwarded_ipv6_addresses_count_with_brackets_and_ports(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        Passport::actingAs($data->user);
+
+        foreach (['[fd00::5]:443', '[fd00::5]', 'fd00::5', '10.0.0.5:8080'] as $internal) {
+            $this->withHeaders(['X-Forwarded-For' => $internal, 'X-Real-IP' => $internal]);
+            $this->ok('get_context');
+        }
+        foreach (['[2001:db8::1]:443', '[2001:db8::1]', '2001:db8::1', '203.0.113.9:8080'] as $public) {
+            $this->withHeaders(['X-Forwarded-For' => '10.0.0.5', 'X-Real-IP' => $public]);
+            $this->callTool('get_context')->assertNotFound();
+        }
+    }
+
     public function test_previews_never_promise_what_the_plan_does_not_store(): void
     {
         $data = $this->createUserWithRole(Role::Admin);
