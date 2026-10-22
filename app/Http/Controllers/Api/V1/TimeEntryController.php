@@ -59,6 +59,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 use Maatwebsite\Excel\Facades\Excel;
 use Spatie\TemporaryDirectory\TemporaryDirectory;
@@ -799,7 +800,7 @@ class TimeEntryController extends Controller
      *
      * Ends the running time entry now. Fails if the time entry was already stopped, so a stop that was requested before someone else stopped or corrected the entry does not overwrite their end.
      *
-     * @throws AuthorizationException|TimeEntryIsNotRunningApiException|OverlappingTimeEntryApiException
+     * @throws AuthorizationException|TimeEntryIsNotRunningApiException|OverlappingTimeEntryApiException|ValidationException
      *
      * @operationId stopTimeEntry
      */
@@ -822,6 +823,12 @@ class TimeEntryController extends Controller
                 throw new TimeEntryIsNotRunningApiException;
             }
             $end = Carbon::now()->startOfSecond();
+            // Entries can start in the future, they can not be stopped before they started
+            if ($end->lt($lockedTimeEntry->start)) {
+                throw ValidationException::withMessages([
+                    'end' => __('validation.after_or_equal', ['attribute' => 'end', 'date' => 'start']),
+                ]);
+            }
             $this->assertNoOverlap($organization, $lockedTimeEntry->member, $lockedTimeEntry->start, $end, $lockedTimeEntry);
             $lockedTimeEntry->end = $end;
             $lockedTimeEntry->save();

@@ -96,6 +96,27 @@ class TimeEntryStopEndpointTest extends ApiEndpointTestAbstract
         $this->assertSame($end->toIso8601ZuluString(), $timeEntry->end?->toIso8601ZuluString());
     }
 
+    public function test_stop_endpoint_fails_if_the_time_entry_starts_in_the_future(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'time-entries:update:own',
+        ]);
+        $timeEntry = TimeEntry::factory()->forOrganization($data->organization)->forMember($data->member)->active()->create([
+            'start' => Carbon::now()->addHour(),
+        ]);
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->postJson(route('api.v1.time-entries.stop', [$data->organization->getKey(), $timeEntry->getKey()]));
+
+        // Assert
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['end']);
+        $timeEntry->refresh();
+        $this->assertNull($timeEntry->end);
+    }
+
     public function test_stop_endpoint_fails_if_user_can_only_update_own_time_entries(): void
     {
         // Arrange
