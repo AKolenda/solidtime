@@ -36,10 +36,25 @@ class TimeEntryUpdateRequest extends BaseFormRequest
      */
     public function rules(): array
     {
+        // A keyed update validates under its row lock, after the replay lookup, so a retry
+        // replays a successful update even if the entry has changed since.
+        if ($this->hasHeader('Idempotency-Key')) {
+            return [];
+        }
+        $timeEntry = $this->route('timeEntry');
+
+        return $this->updateRules($timeEntry instanceof TimeEntry ? $timeEntry : null);
+    }
+
+    /**
+     * The rules against the entry as it is now.
+     *
+     * @return array<string, array<string|Closure|ValidationRule|\Illuminate\Contracts\Validation\Rule|ProhibitedIf|ConditionalRules>>
+     */
+    public function updateRules(?TimeEntry $timeEntry): array
+    {
         // Break restrictions need to apply based on the type the entry will have after the
         // update, not only when the payload itself contains type=break.
-        $timeEntry = $this->route('timeEntry');
-        $timeEntry = $timeEntry instanceof TimeEntry ? $timeEntry : null;
         $resultingType = $this->has('type')
             ? TimeEntryType::tryFrom((string) $this->input('type'))
             : $timeEntry?->type;
@@ -48,6 +63,11 @@ class TimeEntryUpdateRequest extends BaseFormRequest
         return [
             // ID of the organization member that the time entry should belong to
             'member_id' => [
+                // Present means a member: an empty value is refused, not skipped, and a non-string is
+                // refused before the lookup runs
+                'bail',
+                'sometimes',
+                'required',
                 'string',
                 ExistsEloquent::make(Member::class, null, function (Builder $builder): Builder {
                     /** @var Builder<Member> $builder */

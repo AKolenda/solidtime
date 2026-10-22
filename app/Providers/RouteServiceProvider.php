@@ -37,6 +37,15 @@ class RouteServiceProvider extends ServiceProvider
                 : Limit::perMinute(config('app.api_rate_limit_guest_per_minute'))->by($request->ip());
         });
 
+        // MCP messages per token holder; each tool call is limited again by kind (see config/mcp.php)
+        RateLimiter::for('mcp', function (Request $request) {
+            return Limit::perMinute(240)->by('mcp:'.($request->user()?->getAuthIdentifier() ?? $request->ip()));
+        });
+
+        RateLimiter::for('mcp-oauth', function (Request $request) {
+            return Limit::perMinute(30)->by('mcp-oauth:'.$request->ip());
+        });
+
         $this->routes(function (): void {
             Route::middleware('health-check')
                 ->group(function (): void {

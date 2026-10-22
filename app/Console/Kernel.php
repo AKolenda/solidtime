@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console;
 
+use App\Models\McpToolCall;
 use App\Service\SelfHost\DatabaseBackupConfiguration;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -59,6 +60,9 @@ class Kernel extends ConsoleKernel
         }
 
         $schedule->command('import:prune-copies')
+            ->daily();
+
+        $schedule->command('model:prune', ['--model' => [McpToolCall::class]])
             ->daily();
 
         $schedule->command('self-host:database-consistency')

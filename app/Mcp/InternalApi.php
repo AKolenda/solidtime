@@ -1,0 +1,82 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Mcp;
+
+use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Facade;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+
+/**
+ * Sends MCP tool calls through the regular /api/v1 routes as the same user, so every
+ * permission check, validation rule, overlap check and idempotency rule applies unchanged.
+ */
+class InternalApi
+{
+    public function __construct(private readonly Kernel $kernel) {}
+
+    /**
+     * @param  array<string, mixed>  $data  query parameters for GET and DELETE, JSON body otherwise
+     * @param  array<string, string>  $headers
+     * @return array<string, mixed>
+     *
+     * @throws ToolError when the API refuses the request
+     */
+    public function send(string $method, string $path, array $data = [], array $headers = []): array
+    {
+        return $this->sendWithHeaders($method, $path, $data, $headers)[0];
+    }
+
+    /**
+     * As send(), with the response headers (such as ETag) as well.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, string>  $headers
+     * @return array{0: array<string, mixed>, 1: ResponseHeaderBag}
+     *
+     * @throws ToolError when the API refuses the request
+     */
+    public function sendWithHeaders(string $method, string $path, array $data = [], array $headers = []): array
+    {
+        $original = app('request');
+        $server = [
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_HOST' => $original->getHttpHost(),
+            'HTTPS' => $original->isSecure() ? 'on' : 'off',
+            'REMOTE_ADDR' => $original->server('REMOTE_ADDR'),
+        ];
+        if ($original->headers->has('Authorization')) {
+            $server['HTTP_AUTHORIZATION'] = $original->header('Authorization');
+        }
+        foreach ($headers as $name => $value) {
+            $server['HTTP_'.strtoupper(str_replace('-', '_', $name))] = $value;
+        }
+        $uri = '/api/v1/'.ltrim($path, '/');
+        $query = in_array($method, ['GET', 'DELETE'], true);
+        $request = $query
+            ? Request::create($uri, $method, $data, [], [], $server)
+            : Request::create($uri, $method, [], [], [], $server + ['CONTENT_TYPE' => 'application/json'], json_encode($data, JSON_THROW_ON_ERROR));
+
+        try {
+            $response = $this->kernel->handle($request);
+        } finally {
+            // The kernel rebinds the current request; the MCP request continues afterwards
+            app()->instance('request', $original);
+            Facade::clearResolvedInstance('request');
+        }
+
+        $status = $response->getStatusCode();
+        $content = (string) $response->getContent();
+        $body = $content === '' ? [] : json_decode($content, true);
+        if (! is_array($body)) {
+            $body = [];
+        }
+        if ($status >= 400) {
+            throw ToolError::fromApi($status, $body);
+        }
+
+        return [$body, $response->headers];
+    }
+}
