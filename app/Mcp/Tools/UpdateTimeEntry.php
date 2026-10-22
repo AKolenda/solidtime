@@ -59,6 +59,12 @@ class UpdateTimeEntry extends WriteTool
             }
             $body['project_id'] = $entry['project_id'];
         }
+        if (isset($body['task_id'])) {
+            if ($body['project_id'] === null) {
+                throw new ToolError('A task needs its project; pass project_id too.');
+            }
+            $this->checkTaskProject($context, $body['task_id'], $body['project_id']);
+        }
         foreach (['start', 'end'] as $key) {
             if (isset($input[$key])) {
                 $body[$key] = $this->utc($input[$key]);

@@ -52,6 +52,6 @@ class CreateTimeEntry extends WriteTool
         }
 
         return new PlannedChange('Add a time entry', 'POST', $context->path('time-entries'), $body, null, $this->entryPreview($body, $context),
-            $this->presentEntry($context), $this->idempotencyHeaders($input['request_id'] ?? null));
+            $this->presentEntry($context), $this->idempotencyHeaders($input['request_id'] ?? null), $this->billableBinding($input, $body));
     }
 }

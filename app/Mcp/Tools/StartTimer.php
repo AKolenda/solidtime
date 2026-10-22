@@ -59,6 +59,6 @@ class StartTimer extends WriteTool
         $preview = isset($input['start']) ? $body : [...$body, 'start' => null];
 
         return new PlannedChange($summary, 'POST', $context->path('time-entries'), $body, null, $this->entryPreview($preview, $context),
-            $this->presentEntry($context), $this->idempotencyHeaders($input['request_id'] ?? null));
+            $this->presentEntry($context), $this->idempotencyHeaders($input['request_id'] ?? null), $this->billableBinding($input, $body));
     }
 }

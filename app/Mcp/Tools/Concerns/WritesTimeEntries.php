@@ -54,11 +54,8 @@ trait WritesTimeEntries
     {
         $projectId = $input['project_id'] ?? null;
         // A task belongs to one project, which the API requires alongside it: a task alone brings its project
-        if ($projectId === null && isset($input['task_id'])) {
-            $projectId = $context->visibleTaskQuery()?->whereKey($input['task_id'])->value('project_id');
-            if (! is_string($projectId)) {
-                throw new ToolError('Task not found, or not visible to you.', 404);
-            }
+        if (isset($input['task_id'])) {
+            $projectId = $this->checkTaskProject($context, $input['task_id'], $projectId);
         }
         $billable = $input['billable'] ?? ($context->canUseBillableRates() && (bool) ($context->visibleProjects()[$projectId ?? '']['is_billable'] ?? false));
 
@@ -72,6 +69,34 @@ trait WritesTimeEntries
             'description' => $input['description'] ?? null,
             'tags' => $input['tags'] ?? [],
         ];
+    }
+
+    /**
+     * The project of a visible task, refusing one that belongs to another project than the one given.
+     */
+    protected function checkTaskProject(ToolContext $context, string $taskId, ?string $projectId): string
+    {
+        $taskProject = $context->visibleTaskQuery()?->whereKey($taskId)->value('project_id');
+        if (! is_string($taskProject)) {
+            throw new ToolError('Task not found, or not visible to you.', 404);
+        }
+        if ($projectId !== null && $projectId !== $taskProject) {
+            throw new ToolError('That task belongs to another project.');
+        }
+
+        return $taskProject;
+    }
+
+    /**
+     * A billable value the preview worked out from the project, so the confirmation keeps it if the project changes meanwhile.
+     *
+     * @param  array<string, mixed>  $input
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    protected function billableBinding(array $input, array $body): array
+    {
+        return array_key_exists('billable', $input) ? [] : ['billable' => $body['billable']];
     }
 
     /**

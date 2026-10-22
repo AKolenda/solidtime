@@ -714,4 +714,36 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertSame($project->id, TimeEntry::query()->sole()->project_id);
         $this->assertStringContainsString('not visible', $this->error('start_timer', ['task_id' => '00000000-0000-4000-8000-000000000000']));
     }
+
+    public function test_a_task_of_another_project_is_refused_before_the_preview(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        $other = Project::factory()->forOrganization($data->organization)->create();
+        $task = Task::factory()->forProject($other)->forOrganization($data->organization)->create();
+        $entry = TimeEntry::factory()->forOrganization($data->organization)->forMember($data->member)->forProject($project)->create();
+        Passport::actingAs($data->user);
+
+        $this->assertStringContainsString('another project', $this->error('create_time_entry', ['project_id' => $project->id, 'task_id' => $task->id, 'start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T09:00:00Z']));
+        $this->assertStringContainsString('another project', $this->error('start_timer', ['project_id' => $project->id, 'task_id' => $task->id]));
+        $this->assertStringContainsString('another project', $this->error('update_time_entry', ['time_entry_id' => $entry->id, 'task_id' => $task->id]));
+        $this->assertStringContainsString('needs its project', $this->error('update_time_entry', ['time_entry_id' => $entry->id, 'project_id' => null, 'task_id' => $task->id]));
+        $this->assertSame($other->id, $this->ok('update_time_entry', ['time_entry_id' => $entry->id, 'project_id' => $other->id, 'task_id' => $task->id])['after']['project_id']);
+    }
+
+    public function test_the_billable_default_shown_in_the_preview_is_kept_on_confirmation(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $project = Project::factory()->forOrganization($data->organization)->billable()->create();
+        Passport::actingAs($data->user);
+        $arguments = ['project_id' => $project->id, 'start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T09:00:00Z'];
+
+        $preview = $this->ok('create_time_entry', $arguments);
+        $this->assertTrue($preview['after']['billable']);
+        $this->assertTrue($preview['confirm_with']['billable']);
+        $project->update(['is_billable' => false]);
+        $this->ok('create_time_entry', [...$arguments, ...$preview['confirm_with']]);
+        $this->assertTrue(TimeEntry::query()->sole()->billable);
+        $this->assertArrayNotHasKey('billable', $this->ok('start_timer', ['project_id' => $project->id, 'billable' => false])['confirm_with']);
+    }
 }
