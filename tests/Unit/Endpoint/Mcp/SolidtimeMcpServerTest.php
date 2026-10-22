@@ -229,16 +229,20 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->ok('start_timer', [...$arguments, 'confirm' => 'true']);
         $this->assertSame(0, TimeEntry::query()->count());
 
-        $applied = $this->ok('start_timer', [...$arguments, 'confirm' => true]);
+        $this->assertStringContainsString('change_digest', $this->error('start_timer', [...$arguments, 'confirm' => true]));
+        // A confirmation is for the previewed change only, not one its arguments now describe
+        $this->assertStringContainsString('not the change that was previewed', $this->error('start_timer', [...$arguments, 'description' => 'Teardown', ...$preview['confirm_with']]));
+        $applied = $this->ok('start_timer', [...$arguments, ...$preview['confirm_with']]);
         $this->assertTrue($applied['applied']);
         $this->assertTrue($applied['result']['running']);
         $entry = TimeEntry::query()->sole();
         $this->assertNull($entry->end);
         $this->assertSame('Setup', $entry->description);
-        $this->assertSame(['preview', 'preview', 'ok'], McpToolCall::query()->orderBy('created_at')->pluck('outcome')->all());
-        $this->assertSame(['length' => 5], McpToolCall::query()->orderByDesc('created_at')->first()->arguments['description']);
+        $this->assertEqualsCanonicalizing(['preview', 'preview', 'error', 'error', 'ok'], McpToolCall::query()->pluck('outcome')->all());
+        $this->assertSame(['length' => 5], McpToolCall::query()->where('outcome', 'ok')->sole()->arguments['description']);
 
-        $this->assertStringContainsString('running', $this->error('start_timer', [...$arguments, 'start' => '2026-10-21T08:00:00-06:00', 'confirm' => true]));
+        $later = [...$arguments, 'start' => '2026-10-21T08:00:00-06:00'];
+        $this->assertStringContainsString('running', $this->error('start_timer', [...$later, ...$this->ok('start_timer', $later)['confirm_with']]));
         $this->assertSame(1, TimeEntry::query()->count());
     }
 
@@ -246,7 +250,8 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
     {
         $data = $this->createUserWithRole(Role::Employee);
         Passport::actingAs($data->user);
-        $arguments = ['start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T10:00:00Z', 'request_id' => 'erp-action-1234567890', 'confirm' => true];
+        $arguments = ['start' => '2026-10-20T08:00:00Z', 'end' => '2026-10-20T10:00:00Z', 'request_id' => 'erp-action-1234567890'];
+        $arguments = [...$arguments, ...$this->ok('create_time_entry', $arguments)['confirm_with']];
 
         $first = $this->ok('create_time_entry', $arguments);
         $retry = $this->ok('create_time_entry', $arguments);
@@ -317,13 +322,15 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->actAsOrganizationWithSubscription();
         Passport::actingAs($data->user);
 
-        $project = $this->ok('create_project', ['name' => 'Job 7781', 'estimated_hours' => 12.5, 'is_billable' => true, 'confirm' => true])['result'];
+        $project = $this->confirmed('create_project', ['name' => 'Job 7781', 'estimated_hours' => 12.5, 'is_billable' => true])['result'];
         $this->assertEquals(12.5, $project['estimated_hours']);
         Project::query()->whereKey($project['id'])->update(['billable_rate' => 9000]);
 
-        $task = $this->ok('create_task', ['project_id' => $project['id'], 'name' => 'Turning', 'estimated_hours' => 4, 'confirm' => true])['result'];
+        $task = $this->confirmed('create_task', ['project_id' => $project['id'], 'name' => 'Turning', 'estimated_hours' => 4])['result'];
         $this->assertEquals(4.0, $task['estimated_hours']);
 
+        $rename = $this->ok('update_project', ['project_id' => $project['id'], 'name' => 'Job A']);
+        $this->assertStringContainsString('not the change that was previewed', $this->error('update_project', ['project_id' => $project['id'], 'name' => 'Job B', ...$rename['confirm_with']]));
         $this->confirmed('update_project', ['project_id' => $project['id'], 'estimated_hours' => 15]);
         $stored = Project::query()->findOrFail($project['id']);
         $this->assertSame(54000, $stored->estimated_time);
@@ -346,7 +353,7 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $data = $this->createUserWithRole(Role::Employee);
         Passport::actingAs($data->user);
 
-        $this->assertStringContainsString('permission', $this->error('create_project', ['name' => 'Job 1', 'confirm' => true]));
+        $this->assertStringContainsString('permission', $this->error('create_project', ['name' => 'Job 1', ...$this->ok('create_project', ['name' => 'Job 1'])['confirm_with']]));
         $this->assertSame(0, Project::query()->count());
     }
 
@@ -406,7 +413,7 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         Passport::actingAs($data->user);
 
         $this->assertSame('Job 7781', $this->ok('get_project', ['project_id' => $project->id])['project']['name']);
-        $task = $this->ok('create_task', ['project_id' => $project->id, 'name' => 'Turning', 'confirm' => true])['result'];
+        $task = $this->confirmed('create_task', ['project_id' => $project->id, 'name' => 'Turning'])['result'];
         $this->confirmed('update_task', ['task_id' => $task['id'], 'name' => 'Turning OP10']);
         $this->assertSame('Turning OP10', Task::query()->findOrFail($task['id'])->name);
         $this->confirmed('delete_task', ['task_id' => $task['id']]);
@@ -417,9 +424,10 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
     {
         $data = $this->createUserWithRole(Role::Employee);
         Passport::actingAs($data->user);
-        $arguments = ['description' => 'Setup', 'request_id' => 'chat-run-000000000001', 'confirm' => true];
+        $arguments = ['description' => 'Setup', 'request_id' => 'chat-run-000000000001'];
 
         $this->travelTo(Carbon::parse('2026-10-21 14:00:00'));
+        $arguments = [...$arguments, ...$this->ok('start_timer', $arguments)['confirm_with']];
         $first = $this->ok('start_timer', $arguments)['result'];
         $this->travelTo(Carbon::parse('2026-10-21 14:03:20'));
         $retry = $this->ok('start_timer', $arguments)['result'];

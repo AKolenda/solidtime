@@ -68,7 +68,10 @@ destructive. Stop and update tools carry `idempotentHint`.
 2. Only the same call with `confirm: true` (the boolean) makes the change. The
    AI may set it only after the user approved that preview.
 
-The preview's `confirm_with` lists what the confirming call must add. For
+The preview's `confirm_with` lists what the confirming call must add. Every
+change gets a `change_digest`, a signed digest of the exact request the preview
+describes; a confirmation whose arguments now describe anything else is refused
+(409). For
 `update_time_entry`, `stop_timer` and `delete_time_entry` that is the entry's `expected_version`,
 and for a `stop_timer` without `time_entry_id` also the timer it found. The
 project and task updates and deletions return the record's `expected_version`

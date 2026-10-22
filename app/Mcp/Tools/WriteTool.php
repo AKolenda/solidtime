@@ -20,6 +20,16 @@ abstract class WriteTool extends McpTool
     protected bool $writes = true;
 
     /**
+     * Names one change by one user: a confirmation must carry the digest its preview handed out.
+     */
+    private function changeDigest(PlannedChange $change, ToolContext $context): string
+    {
+        $change = [$this->name(), $context->user->getKey(), $context->organization->getKey(), $change->method, $change->path, $change->approvedBody ?? $change->body];
+
+        return hash_hmac('sha256', json_encode($change, JSON_THROW_ON_ERROR), (string) config('app.key'));
+    }
+
+    /**
      * Tool-specific arguments, without confirm.
      *
      * @return array<string, mixed>
@@ -37,6 +47,7 @@ abstract class WriteTool extends McpTool
     {
         return [
             ...$this->changeArguments($schema),
+            'change_digest' => $schema->string()->max(200)->description('The change_digest the preview returned. Required with confirm, so only the previewed change is made.'),
             'confirm' => $schema->boolean()->description('Leave unset to get a preview; nothing changes. Set to true only after the user has seen that preview and explicitly approved this exact change in the conversation. Never set it on your own initiative.'),
         ];
     }
@@ -44,7 +55,7 @@ abstract class WriteTool extends McpTool
     protected function commonRules(): array
     {
         // Any value is accepted here and checked strictly in run()
-        return [...parent::commonRules(), 'confirm' => ['sometimes']];
+        return [...parent::commonRules(), 'change_digest' => ['sometimes', 'string', 'max:200'], 'confirm' => ['sometimes']];
     }
 
     protected function run(array $input, ToolContext $context): Response
@@ -57,19 +68,28 @@ abstract class WriteTool extends McpTool
             throw new ToolError('This organization cannot use billable time.');
         }
         $change = $this->plan($input, $context);
+        $digest = $this->changeDigest($change, $context);
         // Strictly the boolean true: a string or a number is not an approval
         if (($input['confirm'] ?? null) !== true) {
             $this->previewed = true;
+            $confirmWith = [...$change->confirmWith, 'change_digest' => $digest, 'confirm' => true];
 
             return Response::json([
                 'preview' => true,
                 'summary' => $change->summary,
                 'before' => $change->before,
                 'after' => $change->after,
-                'confirm_with' => [...$change->confirmWith, 'confirm' => true],
+                'confirm_with' => $confirmWith,
                 'next_step' => 'Nothing has changed. Show the user this change. Only if they approve it, call '.$this->name().' again with the same arguments plus '
-                    .json_encode([...$change->confirmWith, 'confirm' => true], JSON_UNESCAPED_SLASHES).'.',
+                    .json_encode($confirmWith, JSON_UNESCAPED_SLASHES).'.',
             ]);
+        }
+        // The confirmation makes exactly the change the user approved, not one its arguments now describe
+        if (! isset($input['change_digest'])) {
+            throw new ToolError('Confirm with the change_digest from the preview, so only the previewed change is made.');
+        }
+        if (! hash_equals($digest, $input['change_digest'])) {
+            throw new ToolError('This is not the change that was previewed. Preview it again and ask the user to approve that.', 409);
         }
 
         $send = fn (): array => $context->api->send($change->method, $change->path, $change->body, $change->headers);

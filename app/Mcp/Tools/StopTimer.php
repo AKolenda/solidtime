@@ -69,6 +69,7 @@ class StopTimer extends WriteTool
 
         return new PlannedChange(isset($input['end']) ? 'Stop the running timer' : 'Stop the running timer when the change is confirmed', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
             $this->entryPreview([], $context, $entry), $after, $this->presentEntry($context),
-            $this->versionHeaders($input), [...(isset($input['time_entry_id']) ? [] : ['time_entry_id' => $entry['id']]), ...($etag === null ? [] : ['expected_version' => $etag])]);
+            $this->versionHeaders($input), [...(isset($input['time_entry_id']) ? [] : ['time_entry_id' => $entry['id']]), ...($etag === null ? [] : ['expected_version' => $etag])],
+            approvedBody: isset($input['end']) ? $body : ['end' => null]);
     }
 }
