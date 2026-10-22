@@ -751,6 +751,17 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->ok('update_project', [...$rename, ...$preview['confirm_with']]);
         $this->assertSame('Job 2', $project->fresh()?->name);
 
+        // A change while the preview reads the record is never bound to what it did not show
+        $changed = false;
+        Project::retrieved(function (Project $read) use (&$changed): void {
+            if (! $changed) {
+                $changed = true;
+                Project::query()->whereKey($read->getKey())->update(['name' => 'Job 3']);
+            }
+        });
+        $this->assertStringContainsString('changed while', $this->error('delete_project', ['project_id' => $project->id]));
+        $this->assertTrue($changed);
+
         $deletion = $this->ok('delete_task', ['task_id' => $task->id]);
         $task->update(['name' => 'Turning OP10']);
         $this->assertStringContainsString('changed since the preview', $this->error('delete_task', ['task_id' => $task->id, ...$deletion['confirm_with']]));

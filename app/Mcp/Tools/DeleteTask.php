@@ -44,8 +44,8 @@ class DeleteTask extends WriteTool
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
-        $task = $this->findTask($context, $input['task_id']);
-        [$confirmWith, $guard] = $this->bindToRecord(Task::class, $task['id'], $input, $context, 'task');
+        [$task, $confirmWith, $guard] = $this->bindToRecord(Task::class, $input['task_id'], $input, $context, 'task',
+            fn (): array => $this->findTask($context, $input['task_id']));
         // Counting everyone's entries is only for someone who may see them
         $entries = $context->can('time-entries:view:all')
             ? TimeEntry::query()->whereBelongsTo($context->organization, 'organization')->where('task_id', $task['id'])->count() : null;

@@ -44,8 +44,8 @@ class DeleteProject extends WriteTool
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
-        $project = $this->findProject($context, $input['project_id']);
-        [$confirmWith, $guard] = $this->bindToRecord(Project::class, $project['id'], $input, $context, 'project');
+        [$project, $confirmWith, $guard] = $this->bindToRecord(Project::class, $input['project_id'], $input, $context, 'project',
+            fn (): array => $this->findProject($context, $input['project_id']));
         // Counting everyone's entries is only for someone who may see them
         $entries = $context->can('time-entries:view:all')
             ? TimeEntry::query()->whereBelongsTo($context->organization, 'organization')->where('project_id', $project['id'])->count() : null;

@@ -50,8 +50,8 @@ class UpdateTask extends WriteTool
 
     protected function plan(array $input, ToolContext $context): PlannedChange
     {
-        $task = $this->findTask($context, $input['task_id']);
-        [$confirmWith, $guard] = $this->bindToRecord(Task::class, $task['id'], $input, $context, 'task');
+        [$task, $confirmWith, $guard] = $this->bindToRecord(Task::class, $input['task_id'], $input, $context, 'task',
+            fn (): array => $this->findTask($context, $input['task_id']));
         $changes = array_intersect_key($input, array_flip(['name', 'is_done']));
         if (array_key_exists('estimated_hours', $input)) {
             $changes['estimated_time'] = $this->seconds($input['estimated_hours']);

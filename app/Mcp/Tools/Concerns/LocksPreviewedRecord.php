@@ -21,16 +21,23 @@ trait LocksPreviewedRecord
     use BindsToPreviewedVersion;
 
     /**
-     * What the preview hands out, and the check the confirmation runs with the record locked.
+     * The record as the preview shows it, what the preview hands out, and the check the
+     * confirmation runs with the record locked.
      *
      * @param  class-string<Project|Task>  $class
      * @param  array<string, mixed>  $input
-     * @return array{0: array<string, string>, 1: Closure(): void}
+     * @param  Closure(): array<string, mixed>  $read  the record as the preview shows it
+     * @return array{0: array<string, mixed>, 1: array<string, string>, 2: Closure(): void}
      */
-    protected function bindToRecord(string $class, string $id, array $input, ToolContext $context, string $what): array
+    protected function bindToRecord(string $class, string $id, array $input, ToolContext $context, string $what, Closure $read): array
     {
         $query = fn () => $class::query()->whereBelongsTo($context->organization, 'organization')->whereKey($id);
+        // The version read before and after what the preview shows, so it is the version of what it shows
         $current = $this->recordVersion($query()->first());
+        $record = $read();
+        if ($this->recordVersion($query()->first()) !== $current) {
+            throw new ToolError("The {$what} changed while it was being read. Try again.", 409);
+        }
         if (($input['confirm'] ?? null) === true) {
             if (! isset($input['expected_version'])) {
                 throw new ToolError("Confirm with the expected_version from the preview, so only the previewed state of the {$what} is changed.");
@@ -41,7 +48,7 @@ trait LocksPreviewedRecord
             }
         }
 
-        return [$current === null ? [] : ['expected_version' => $current], function () use ($query, $current, $what): void {
+        return [$record, $current === null ? [] : ['expected_version' => $current], function () use ($query, $current, $what): void {
             if ($this->recordVersion($query()->lockForUpdate()->first()) !== $current) {
                 throw new ToolError("The {$what} changed since the preview. Preview the change again.", 412);
             }
