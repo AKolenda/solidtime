@@ -11,12 +11,13 @@ return [
     |
     | The MCP endpoint (POST /mcp) lets AI clients act as the signed-in user
     | through the regular API, with that user's organization permissions.
-    | It is meant for the internal network only: requests from addresses
-    | outside "allowed_networks", and requests relayed by Cloudflare, get 404.
+    | It is meant for the internal network only: requests with any address
+    | (connecting or forwarded) outside "allowed_networks", and requests
+    | relayed by Cloudflare, get 404. It is off until MCP_ENABLED=true.
     |
     */
 
-    'enabled' => (bool) env('MCP_ENABLED', true),
+    'enabled' => (bool) env('MCP_ENABLED', false),
 
     'allowed_networks' => array_values(array_filter(array_map('trim', explode(',', (string) env(
         'MCP_ALLOWED_NETWORKS',

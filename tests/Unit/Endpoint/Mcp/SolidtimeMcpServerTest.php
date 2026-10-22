@@ -21,6 +21,12 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
 {
     private int $id = 0;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['mcp.enabled' => true]);
+    }
+
     /**
      * @param  array<string, mixed>  $arguments
      */
@@ -458,9 +464,47 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
     public function test_estimated_hours_stay_within_what_the_api_stores(): void
     {
         $data = $this->createUserWithRole(Role::Admin);
+        $this->actAsOrganizationWithSubscription();
         Passport::actingAs($data->user);
 
         $this->error('create_project', ['name' => 'Job 1', 'estimated_hours' => 600000]);
         $this->assertSame(596523.0, (float) $this->ok('create_project', ['name' => 'Job 1', 'estimated_hours' => 596523])['after']['estimated_hours']);
+    }
+
+    public function test_mcp_is_off_unless_enabled(): void
+    {
+        config(['mcp.enabled' => false]);
+        $data = $this->createUserWithRole(Role::Employee);
+        Passport::actingAs($data->user);
+
+        $this->callTool('get_context')->assertNotFound();
+    }
+
+    public function test_every_forwarded_address_must_be_internal(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        Passport::actingAs($data->user);
+
+        $this->withHeader('X-Forwarded-For', '10.0.0.5, 203.0.113.9');
+        $this->callTool('get_context')->assertNotFound();
+        $this->withHeader('X-Forwarded-For', '10.0.0.5');
+        $this->ok('get_context');
+        $this->withHeader('Forwarded', 'for="[2001:db8::1]:443"');
+        $this->callTool('get_context')->assertNotFound();
+    }
+
+    public function test_previews_never_promise_what_the_plan_does_not_store(): void
+    {
+        $data = $this->createUserWithRole(Role::Admin);
+        $project = Project::factory()->forOrganization($data->organization)->create();
+        Passport::actingAs($data->user);
+
+        $this->assertStringContainsString('estimated hours', $this->error('create_project', ['name' => 'Job 1', 'estimated_hours' => 10]));
+        $this->assertStringContainsString('estimated hours', $this->error('update_project', ['project_id' => $project->id, 'estimated_hours' => null]));
+        $this->actAsOrganizationWithoutBillableRates();
+        $this->assertStringContainsString('billable', $this->error('start_timer', ['billable' => true]));
+        $this->assertStringContainsString('billable', $this->error('create_project', ['name' => 'Job 2', 'is_billable' => true]));
+        $this->assertFalse($this->ok('start_timer', ['project_id' => $project->id])['after']['billable']);
+        $this->assertSame(1, Project::query()->count());
     }
 }

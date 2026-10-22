@@ -12,6 +12,7 @@ use App\Models\Organization;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Service\BillingContract;
 use App\Service\PermissionStore;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -54,6 +55,20 @@ class ToolContext
     public function can(string $permission): bool
     {
         return app(PermissionStore::class)->has($this->organization, $permission);
+    }
+
+    /** Billable time and rates; without them the API stores entries and projects as not billable. */
+    public function canUseBillableRates(): bool
+    {
+        return app(BillingContract::class)->canUseBillableRates($this->organization);
+    }
+
+    /** Estimated hours on projects and tasks, which the API stores only with a subscription or trial. */
+    public function canUseEstimates(): bool
+    {
+        $billing = app(BillingContract::class);
+
+        return $billing->hasSubscription($this->organization) || $billing->hasTrial($this->organization);
     }
 
     /**

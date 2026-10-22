@@ -6,6 +6,7 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\PlannedChange;
 use App\Mcp\ToolContext;
+use App\Mcp\ToolError;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Response;
 
@@ -47,6 +48,13 @@ abstract class WriteTool extends McpTool
 
     protected function run(array $input, ToolContext $context): Response
     {
+        // The API silently drops these on such plans, so a preview must not promise them
+        if (array_key_exists('estimated_hours', $input) && ! $context->canUseEstimates()) {
+            throw new ToolError("This organization's plan does not store estimated hours.");
+        }
+        if ((($input['billable'] ?? false) === true || ($input['is_billable'] ?? false) === true) && ! $context->canUseBillableRates()) {
+            throw new ToolError('This organization cannot use billable time.');
+        }
         $change = $this->plan($input, $context);
         // Strictly the boolean true: a string or a number is not an approval
         if (($input['confirm'] ?? null) !== true) {

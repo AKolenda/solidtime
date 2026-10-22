@@ -21,14 +21,15 @@ network only.
   - Registered redirect URIs must be on `MCP_REDIRECT_DOMAINS`
     (default `http://localhost,http://127.0.0.1`).
 - **Where**: `/mcp` and the OAuth registration and discovery routes answer 404
-  in two cases:
-  - the client address is outside `MCP_ALLOWED_NETWORKS` (default loopback
-    and private ranges);
-  - the request came through Cloudflare (`Cf-Ray` or `Cf-Connecting-Ip`).
-
-  Keep `TRUSTED_PROXIES` accurate so the client address is the real one. Do
-  not publish `/mcp` through a tunnel.
-- **Off switch**: `MCP_ENABLED=false`.
+  unless every address the request carries is inside `MCP_ALLOWED_NETWORKS`
+  (default loopback and private ranges). That covers the connecting address and
+  each hop in `X-Forwarded-For`, `Forwarded` and `X-Real-IP`, whether or not
+  the proxy is trusted. So a public client behind a reverse proxy that
+  forwards its address is refused, even if it claims an internal one. Requests
+  relayed by Cloudflare (`Cf-Ray` or `Cf-Connecting-Ip`) are refused outright.
+  Do not publish `/mcp` through a tunnel, or through a proxy that does not
+  forward the client's address.
+- **On switch**: MCP is off until `MCP_ENABLED=true`.
 
 ## Tools
 

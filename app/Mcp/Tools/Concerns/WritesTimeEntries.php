@@ -52,7 +52,7 @@ trait WritesTimeEntries
     protected function newEntryBody(array $input, ToolContext $context, string $start, ?string $end): array
     {
         $projectId = $input['project_id'] ?? null;
-        $billable = $input['billable'] ?? (bool) ($context->visibleProjects()[$projectId ?? '']['is_billable'] ?? false);
+        $billable = $input['billable'] ?? ($context->canUseBillableRates() && (bool) ($context->visibleProjects()[$projectId ?? '']['is_billable'] ?? false));
 
         return [
             'member_id' => $input['member_id'] ?? $context->member->getKey(),
