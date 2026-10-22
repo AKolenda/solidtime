@@ -688,4 +688,16 @@ class SolidtimeMcpServerTest extends TestCaseWithDatabase
         $this->assertSame(40, $this->ok('list_projects')['count']);
         $this->assertLessThan(40, count(DB::getQueryLog()));
     }
+
+    public function test_a_stop_left_to_the_confirmation_is_not_shown_as_fixed(): void
+    {
+        $data = $this->createUserWithRole(Role::Employee);
+        TimeEntry::factory()->forMember($data->member)->create(['start' => Carbon::parse('2026-10-21 13:00:00'), 'end' => null]);
+        Passport::actingAs($data->user);
+
+        $preview = $this->ok('stop_timer');
+        $this->assertNull($preview['after']['end']);
+        $this->assertNull($preview['after']['hours']);
+        $this->assertStringContainsString('when the change is confirmed', $preview['summary']);
+    }
 }

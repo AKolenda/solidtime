@@ -64,8 +64,11 @@ class StopTimer extends WriteTool
             throw new ToolError('The end must not be before the timer started.');
         }
 
-        return new PlannedChange('Stop the running timer', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
-            $this->entryPreview([], $context, $entry), $this->entryPreview($body, $context, $entry), $this->presentEntry($context),
+        // Without an end the timer stops on confirmation, so the preview shows no fixed time
+        $after = isset($input['end']) ? $this->entryPreview($body, $context, $entry) : [...$this->entryPreview([], $context, $entry), 'running' => false];
+
+        return new PlannedChange(isset($input['end']) ? 'Stop the running timer' : 'Stop the running timer when the change is confirmed', 'PUT', $context->path('time-entries/'.$entry['id']), $body,
+            $this->entryPreview([], $context, $entry), $after, $this->presentEntry($context),
             $this->versionHeaders($input), [...(isset($input['time_entry_id']) ? [] : ['time_entry_id' => $entry['id']]), ...($etag === null ? [] : ['expected_version' => $etag])]);
     }
 }
