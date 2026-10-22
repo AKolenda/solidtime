@@ -4312,7 +4312,7 @@ Users with the permission &#x60;time-entries:view:own&#x60; can only use this en
             {
                 name: 'limit',
                 type: 'Query',
-                schema: z.number().int().gte(1).lte(500).optional(),
+                schema: z.number().int().gte(1).lte(10000).optional(),
             },
             {
                 name: 'offset',
@@ -5101,7 +5101,7 @@ If the group parameters are all set to &#x60;null&#x60; or are all missing, the 
             {
                 name: 'limit',
                 type: 'Query',
-                schema: z.number().int().gte(1).lte(500).optional(),
+                schema: z.number().int().gte(1).optional(),
             },
             {
                 name: 'only_full_dates',

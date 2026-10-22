@@ -261,6 +261,8 @@ async function clearSelectionAndState() {
 async function downloadExport(format: ExportFormat) {
     const organizationId = getCurrentOrganizationId();
     if (organizationId) {
+        // The export always covers every matching entry; the page size only applies to the table.
+        const { limit: _limit, offset: _offset, ...filterAttributes } = getFilterAttributes();
         const response = await handleApiRequestNotifications(
             () =>
                 api.exportTimeEntries({
@@ -268,7 +270,7 @@ async function downloadExport(format: ExportFormat) {
                         organization: organizationId,
                     },
                     queries: {
-                        ...getFilterAttributes(),
+                        ...filterAttributes,
                         format: format,
                     },
                 }),
