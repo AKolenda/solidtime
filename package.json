@@ -32,7 +32,7 @@
         "@tailwindcss/forms": "^0.5.11",
         "@tailwindcss/typography": "^0.5.19",
         "@types/chroma-js": "^3.1.2",
-        "@types/node": "^22.19.19",
+        "@types/node": "^26",
         "@vitejs/plugin-vue": "^6.0.6",
         "@vue/test-utils": "^2.4.6",
         "@vue/tsconfig": "^0.8.1",
