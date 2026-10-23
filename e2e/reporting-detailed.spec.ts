@@ -821,4 +821,38 @@ test.describe('Reporting Detailed Pagination', () => {
         });
         await expect(page.getByRole('button', { name: 'Next Page' })).toHaveCount(0);
     });
+
+    test('test that exporting with all entries per page sends no limit', async ({ page, ctx }) => {
+        const seed = Math.floor(Math.random() * 100000);
+        const project = await createProjectViaApi(ctx, { name: `ExportAllProj ${seed}` });
+        await createTimeEntryViaApi(ctx, {
+            description: `ExportAll ${seed}`,
+            duration: '30min',
+            projectId: project.id,
+        });
+
+        await goToReportingDetailed(page);
+        await expect(page.getByText(`ExportAll ${seed}`).first()).toBeVisible({
+            timeout: 10000,
+        });
+
+        // "All" fetches the table with a large limit; the export must not reuse it.
+        await page.getByTestId('report_page_size').click();
+        await Promise.all([
+            page.getByRole('option', { name: 'All', exact: true }).click(),
+            waitForDetailedReportingUpdate(page),
+        ]);
+
+        await page.getByRole('button', { name: 'Export' }).click();
+        const [exportResponse] = await Promise.all([
+            page.waitForResponse((response) => response.url().includes('/time-entries/export')),
+            page.getByRole('menuitem', { name: /Export as CSV/i }).click(),
+        ]);
+
+        const exportUrl = new URL(exportResponse.url());
+        expect(exportUrl.searchParams.has('limit')).toBe(false);
+        expect(exportUrl.searchParams.has('offset')).toBe(false);
+        expect(exportResponse.status()).toBe(200);
+        await expect(page.getByText('Export Successful!')).toBeVisible();
+    });
 });

@@ -163,11 +163,10 @@ class TimeEntryIndexExportRequest extends TimeEntryIndexRequest
                 'string',
                 Rule::enum(TimeEntryType::class),
             ],
-            // Limit the number of returned time entries (default: 150)
+            // Accepted for compatibility with the index filters; the export always includes every matching time entry
             'limit' => [
                 'integer',
                 'min:1',
-                'max:500',
             ],
             // Filter makes sure that only time entries of a whole date are returned
             'only_full_dates' => [

@@ -121,7 +121,7 @@ class TimeEntryController extends Controller
      * Users with the permission `time-entries:view:own` can only use this endpoint with their own member ID in the member_id filter.
      *
      * The `start` and `end` filters both apply to the start time of an entry, in UTC. Convert the user's local day boundaries to UTC first.
-     * Results are paginated with `limit` (default 100, max 500) and `offset`; check `meta.total` and fetch further pages when needed.
+     * Results are paginated with `limit` (default 100, max 10000) and `offset`; check `meta.total` and fetch further pages when needed.
      * To find the running timer, use `active=true` (or `GET /v1/users/me/time-entries/active`).
      *
      * @throws AuthorizationException
