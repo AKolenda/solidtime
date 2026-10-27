@@ -25,6 +25,7 @@ vi.mock('@/utils/money', () => ({ getOrganizationCurrencyString: () => 'CAD' }))
 vi.mock('@/utils/billing', () => ({ isAllowedToPerformPremiumAction: () => false }));
 vi.mock('@/utils/permissions', () => ({
     canCreateProjects: () => false,
+    canCreateTasks: () => false,
     canUpdateTimeEntries: () => permissionState.updateAll,
     canUpdateOwnTimeEntries: () => permissionState.updateOwn,
 }));

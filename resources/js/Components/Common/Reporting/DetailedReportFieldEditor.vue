@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { useMediaQuery } from '@vueuse/core';
+import { PlusIcon } from '@heroicons/vue/16/solid';
 import Checkbox from '@/packages/ui/src/Input/Checkbox.vue';
 import {
     ComboboxRoot,
@@ -91,7 +92,8 @@ function timeLabel(entry: TimeEntry) {
     return `${start.format('YYYY-MM-DD HH:mm')} – ${end ? end.format(end.isSame(start, 'day') ? 'HH:mm' : 'YYYY-MM-DD HH:mm') : 'Running'}`;
 }
 
-type Option = { id: string; name: string; detail?: string };
+// `create` holds the name of a task to create in the entry's project when chosen.
+type Option = { id: string; name: string; detail?: string; create?: string };
 const projectPicker = computed(() => props.field === 'project' || props.field === 'client');
 const listField = computed(() =>
     ['project', 'client', 'task', 'member', 'tags', 'billable'].includes(props.field)
@@ -99,6 +101,28 @@ const listField = computed(() =>
 const clientsById = computed(
     () => new Map(props.context.clients.map((client) => [client.id, client.name]))
 );
+// Task names used in other projects, most used first, offered for creation in this project.
+const taskSuggestions = computed<Option[]>(() => {
+    const projectId = selectedEntry.value.project_id;
+    if (props.field !== 'task' || !projectId || !props.context.createTask) return [];
+    const existing = new Set(
+        props.context.tasks
+            .filter((task) => task.project_id === projectId)
+            .map((task) => task.name.trim().toLowerCase())
+    );
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const task of props.context.tasks) {
+        const name = task.name.trim();
+        const key = name.toLowerCase();
+        if (!name || existing.has(key)) continue;
+        const suggestion = counts.get(key) ?? { name, count: 0 };
+        suggestion.count++;
+        counts.set(key, suggestion);
+    }
+    return [...counts.values()]
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+        .map(({ name }) => ({ id: `new:${name.toLowerCase()}`, name, create: name }));
+});
 const options = computed<Option[]>(() => {
     if (choosingClient.value) {
         return [
@@ -134,6 +158,7 @@ const options = computed<Option[]>(() => {
                     name: task.name,
                     detail: task.is_done ? 'Completed' : undefined,
                 })),
+            ...taskSuggestions.value,
         ];
     }
     if (props.field === 'member')
@@ -147,9 +172,20 @@ const options = computed<Option[]>(() => {
 });
 const filteredOptions = computed(() => {
     const query = search.value.trim().toLowerCase();
-    return options.value.filter((option) =>
+    const matches = options.value.filter((option) =>
         `${option.name} ${option.detail ?? ''}`.toLowerCase().includes(query)
     );
+    if (
+        props.field === 'task' &&
+        query &&
+        selectedEntry.value.project_id &&
+        props.context.createTask &&
+        !options.value.some((option) => option.id && option.name.toLowerCase() === query)
+    ) {
+        const name = search.value.trim();
+        matches.push({ id: `new:${query}`, name: `Create task "${name}"`, create: name });
+    }
+    return matches;
 });
 function isSelected(id: string) {
     const entry = selectedEntry.value;
@@ -166,7 +202,7 @@ function isSelected(id: string) {
     return String(entry.billable) === id;
 }
 
-async function save(changes: ReportEntryChanges) {
+async function save(changes: ReportEntryChanges | (() => Promise<ReportEntryChanges>)) {
     if (saving.value) return;
     saving.value = true;
     emit('saving', true);
@@ -174,7 +210,7 @@ async function save(changes: ReportEntryChanges) {
     try {
         await props.context.update(
             targetEntries.value.map((entry) => entry.id),
-            changes
+            typeof changes === 'function' ? await changes() : changes
         );
         emit('close');
     } catch (cause) {
@@ -188,8 +224,19 @@ async function save(changes: ReportEntryChanges) {
     }
 }
 
-function chooseOption(id: string) {
+function chooseOption(option: Option) {
+    const id = option.id;
     if (saving.value) return;
+    const projectId = selectedEntry.value.project_id;
+    if (option.create !== undefined && projectId && props.context.createTask) {
+        const { createTask } = props.context;
+        const name = option.create;
+        void save(async () => ({
+            project_id: projectId,
+            task_id: await createTask(projectId, name),
+        }));
+        return;
+    }
     if (choosingClient.value) {
         selectedClient.value = id;
         search.value = '';
@@ -300,8 +347,13 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                                     :value="option.id || '__none__'"
                                     :disabled="saving"
                                     class="flex w-full min-h-11 sm:min-h-8 items-center gap-2 rounded-md px-2 py-1.5 text-sm text-text-primary cursor-default data-[highlighted]:bg-card-background-active"
-                                    @select.prevent="chooseOption(option.id)">
+                                    @select.prevent="chooseOption(option)">
+                                    <PlusIcon
+                                        v-if="option.create !== undefined"
+                                        aria-hidden="true"
+                                        class="size-4 shrink-0 text-icon-default" />
                                     <Checkbox
+                                        v-else
                                         :checked="isSelected(option.id)"
                                         aria-hidden="true"
                                         :tabindex="-1"

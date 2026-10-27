@@ -30,7 +30,7 @@ export const useTasksStore = defineStore('tasks', () => {
     async function createTask(task: CreateTaskBody) {
         const organizationId = getCurrentOrganizationId();
         if (organizationId) {
-            await handleApiRequestNotifications(
+            const response = await handleApiRequestNotifications(
                 () =>
                     api.createTask(task, {
                         params: {
@@ -41,6 +41,7 @@ export const useTasksStore = defineStore('tasks', () => {
                 'Failed to create task'
             );
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            return response.data;
         }
     }
 
