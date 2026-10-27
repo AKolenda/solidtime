@@ -39,4 +39,6 @@ export interface ReportEntryEditorContext {
     canEdit: (entry: TimeEntry) => boolean;
     loadOriginalEntries?: (ids: string[]) => Promise<TimeEntry[]>;
     update: (ids: string[], changes: ReportEntryChanges) => Promise<void>;
+    /** Creates a task in the project and returns its id. Absent without permission to create tasks. */
+    createTask?: (projectId: string, name: string) => Promise<string>;
 }

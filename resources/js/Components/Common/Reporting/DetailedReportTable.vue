@@ -21,6 +21,7 @@ import { useBreaksEnabled } from '@/packages/ui/src/utils/useBreaksEnabled';
 import { useProjectsQuery } from '@/utils/useProjectsQuery';
 import { useProjectsStore } from '@/utils/useProjects';
 import { useTasksQuery } from '@/utils/useTasksQuery';
+import { useTasksStore } from '@/utils/useTasks';
 import { useClientsQuery } from '@/utils/useClientsQuery';
 import { useClientsStore } from '@/utils/useClients';
 import { useTagsQuery } from '@/utils/useTagsQuery';
@@ -32,6 +33,7 @@ import { getOrganizationCurrencyString } from '@/utils/money';
 import { isAllowedToPerformPremiumAction } from '@/utils/billing';
 import {
     canCreateProjects,
+    canCreateTasks,
     canUpdateTimeEntries,
     canUpdateOwnTimeEntries,
 } from '@/utils/permissions';
@@ -81,6 +83,13 @@ const editorContext = computed<ReportEntryEditorContext>(() => ({
     canEdit: (entry) =>
         canUpdateTimeEntries() || (canUpdateOwnTimeEntries() && entry.user_id === currentUserId),
     loadOriginalEntries: props.loadOriginalEntries,
+    createTask: canCreateTasks()
+        ? async (projectId, name) => {
+              const task = await useTasksStore().createTask({ name, project_id: projectId });
+              if (!task) throw new Error('Could not create the task. Please try again.');
+              return task.id;
+          }
+        : undefined,
     update: async (ids, changes) => {
         if (ids.length === 1) {
             await props.updateTimeEntry({ id: ids[0]!, ...changes });

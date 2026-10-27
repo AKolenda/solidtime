@@ -200,6 +200,65 @@ test('test that task multiselect dropdown filters reporting by task', async ({ p
     await expect(page.getByText(`Entry for ${projectName} - ${task2}`).first()).not.toBeVisible();
 });
 
+test('test that the task editor creates a task suggested from another project', async ({
+    page,
+    ctx,
+}) => {
+    const seed = Math.floor(Math.random() * 100000);
+    const project = await createProjectViaApi(ctx, { name: `TaskTarget ${seed}` });
+    const otherProject = await createProjectViaApi(ctx, { name: `TaskSource ${seed}` });
+    const reusedName = `Turning - Running ${seed}`;
+    await createTaskViaApi(ctx, { name: reusedName, project_id: otherProject.id });
+    await createTimeEntryViaApi(ctx, {
+        description: `TaskCreate ${seed}`,
+        duration: '30min',
+        projectId: project.id,
+    });
+
+    await goToReportingDetailed(page);
+    await expect(page.getByText(`TaskCreate ${seed}`).first()).toBeVisible();
+
+    // A name used in another project is offered for this project.
+    await page.locator('[data-edit-field="task"]').first().click();
+    await page.getByLabel('Search task').fill('turning - running');
+    const suggestion = page.getByRole('option', { name: reusedName, exact: true });
+    await expect(suggestion).toBeVisible();
+    const [createResponse] = await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/tasks') &&
+                response.request().method() === 'POST' &&
+                response.status() === 201
+        ),
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/time-entries') &&
+                response.request().method() === 'PUT' &&
+                response.status() === 200
+        ),
+        suggestion.click(),
+    ]);
+    const created = (await createResponse.json()).data;
+    expect(created.project_id).toBe(project.id);
+    expect(created.name).toBe(reusedName);
+    await expect(page.locator('[data-edit-field="task"]').first()).toContainText(reusedName);
+
+    // A brand-new name can be typed and created.
+    const newName = `Deburr ${seed}`;
+    await page.locator('[data-edit-field="task"]').first().click();
+    await page.getByLabel('Search task').fill(newName);
+    await Promise.all([
+        page.waitForResponse(
+            (response) =>
+                response.url().includes('/time-entries') &&
+                response.request().method() === 'PUT' &&
+                response.status() === 200
+        ),
+        page.getByRole('option', { name: `Create task "${newName}"` }).click(),
+    ]);
+    await expect(page.locator('[data-edit-field="task"]').first()).toContainText(newName);
+});
+
 test('test that selecting multiple tasks shows correct badge count', async ({ page, ctx }) => {
     const projectName = 'MultiTaskProj ' + Math.floor(Math.random() * 10000);
     const task1 = 'MultiTask1 ' + Math.floor(Math.random() * 10000);
