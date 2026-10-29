@@ -15,6 +15,14 @@ function getNameForItem(item: Project) {
     return item.name;
 }
 
+function getDateForItem(item: Project) {
+    return item.last_activity_at;
+}
+
+function isItemInactive(item: Project) {
+    return item.is_archived;
+}
+
 const emit = defineEmits<{
     submit: [];
 }>();
@@ -26,6 +34,9 @@ const emit = defineEmits<{
         :items="projects"
         :get-key-from-item="getKeyFromItem"
         :get-name-for-item="getNameForItem"
+        :get-date-for-item="getDateForItem"
+        :is-item-inactive="isItemInactive"
+        inactive-label="Show archived"
         no-item-label="No Project"
         :resizable-storage-key="projectPickerStorageKey(getCurrentUserId())"
         @submit="emit('submit')">

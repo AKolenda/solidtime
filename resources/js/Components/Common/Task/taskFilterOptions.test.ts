@@ -55,4 +55,32 @@ describe('task filter options', () => {
 
         expect(getSelectedTaskOptionKeys(options, ['milling-a-2'])).toEqual([options[0]?.key]);
     });
+
+    it('dates a grouped option by its latest entry and marks it done only when every task is', () => {
+        const options = buildTaskFilterOptions(
+            [
+                {
+                    ...task('milling-a', 'Milling', 'project-a'),
+                    is_done: true,
+                    last_activity_at: '2026-10-20T08:00:00Z',
+                },
+                {
+                    ...task('milling-b', 'Milling', 'project-b'),
+                    is_done: false,
+                    last_activity_at: '2026-10-27T08:00:00Z',
+                },
+                {
+                    ...task('deburr-a', 'Deburr', 'project-a'),
+                    is_done: true,
+                    last_activity_at: null,
+                },
+            ],
+            []
+        );
+
+        expect(options).toMatchObject([
+            { name: 'Deburr', lastActivityAt: null, isDone: true },
+            { name: 'Milling', lastActivityAt: '2026-10-27T08:00:00Z', isDone: false },
+        ]);
+    });
 });

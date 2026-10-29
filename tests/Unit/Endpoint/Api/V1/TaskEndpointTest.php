@@ -79,6 +79,31 @@ class TaskEndpointTest extends ApiEndpointTestAbstract
         $response->assertJsonCount(4, 'data');
     }
 
+    public function test_index_endpoint_returns_start_of_latest_time_entry_as_last_activity_at(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'tasks:view',
+            'tasks:view:all',
+        ]);
+        $taskWithEntries = Task::factory()->forOrganization($data->organization)->create();
+        $taskWithoutEntries = Task::factory()->forOrganization($data->organization)->create();
+        TimeEntry::factory()->forOrganization($data->organization)->forTask($taskWithEntries)
+            ->start(Carbon::parse('2026-10-20 08:00:00', 'UTC'))->create();
+        TimeEntry::factory()->forOrganization($data->organization)->forTask($taskWithEntries)
+            ->start(Carbon::parse('2026-10-27 09:30:00', 'UTC'))->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.tasks.index', [$data->organization->getKey()]));
+
+        // Assert
+        $response->assertStatus(200);
+        $lastActivityAt = collect($response->json('data'))->pluck('last_activity_at', 'id');
+        $this->assertSame('2026-10-27T09:30:00Z', $lastActivityAt[$taskWithEntries->getKey()]);
+        $this->assertNull($lastActivityAt[$taskWithoutEntries->getKey()]);
+    }
+
     public function test_index_endpoint_returns_tasks_ordered_by_created_at_descending(): void
     {
         // Arrange

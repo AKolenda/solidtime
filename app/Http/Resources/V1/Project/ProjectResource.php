@@ -50,6 +50,8 @@ class ProjectResource extends BaseResource
             'spent_time' => $this->resource->spent_time,
             /** Whether the project is public */
             'is_public' => $this->resource->is_public,
+            /** Start of the latest time entry on this project (ISO 8601 format, UTC timezone), only set in the project list */
+            'last_activity_at' => $this->formatLastActivityAt($this->resource),
         ];
     }
 }

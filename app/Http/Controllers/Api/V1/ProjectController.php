@@ -47,7 +47,8 @@ class ProjectController extends Controller
         $user = $this->user();
 
         $projectsQuery = Project::query()
-            ->whereBelongsTo($organization, 'organization');
+            ->whereBelongsTo($organization, 'organization')
+            ->withMax('timeEntries', 'start');
 
         if (! $canViewAllProjects) {
             $projectsQuery->visibleByEmployee($user);

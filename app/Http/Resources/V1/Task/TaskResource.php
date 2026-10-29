@@ -38,6 +38,8 @@ class TaskResource extends BaseResource
             'created_at' => $this->formatDateTime($this->resource->created_at),
             /** When the tag was last updated */
             'updated_at' => $this->formatDateTime($this->resource->updated_at),
+            /** Start of the latest time entry on this task (ISO 8601 format, UTC timezone), only set in the task list */
+            'last_activity_at' => $this->formatLastActivityAt($this->resource),
         ];
     }
 }

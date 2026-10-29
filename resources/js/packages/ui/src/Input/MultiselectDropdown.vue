@@ -3,6 +3,7 @@ import Dropdown from '@/packages/ui/src/Input/Dropdown.vue';
 import { computed, ref, watch } from 'vue';
 import Checkbox from '@/packages/ui/src/Input/Checkbox.vue';
 import { useResizableDropdown } from '@/packages/ui/src/Input/useResizableDropdown';
+import { getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import {
     ComboboxAnchor,
     ComboboxContent,
@@ -31,12 +32,18 @@ const props = defineProps<{
     getNameForItem: (item: T) => string;
     noItemLabel?: string;
     resizableStorageKey?: string;
+    // When set, items are listed most recent first and show this date.
+    getDateForItem?: (item: T) => string | null | undefined;
+    // When set, inactive items stay hidden until the user shows them with the inactiveLabel toggle.
+    isItemInactive?: (item: T) => boolean;
+    inactiveLabel?: string;
 }>();
 
 const open = ref(false);
 const searchValue = ref('');
 // Pinned on open so rows don't re-sort while toggling; the item list itself stays reactive.
 const pinnedSelection = ref<Set<string>>(new Set());
+const showInactive = ref(false);
 
 watch(open, (isOpen) => {
     if (isOpen) {
@@ -50,17 +57,49 @@ const sortedItems = computed(() => {
         const aSelected = pinnedSelection.value.has(props.getKeyFromItem(a)) ? 0 : 1;
         const bSelected = pinnedSelection.value.has(props.getKeyFromItem(b)) ? 0 : 1;
         if (aSelected !== bSelected) return aSelected - bSelected;
+        if (props.getDateForItem) {
+            const aDate = props.getDateForItem(a) ?? '';
+            const bDate = props.getDateForItem(b) ?? '';
+            if (aDate !== bDate) return aDate < bDate ? 1 : -1;
+        }
         return props.getNameForItem(a).localeCompare(props.getNameForItem(b));
     });
 });
 
-const filteredItems = computed(() => {
+const searchedItems = computed(() => {
     const search = searchValue.value.toLowerCase().trim();
     if (!search) return sortedItems.value;
     return sortedItems.value.filter((item) =>
         props.getNameForItem(item).toLowerCase().includes(search)
     );
 });
+
+function isHidden(item: T): boolean {
+    return (
+        !showInactive.value &&
+        !!props.isItemInactive?.(item) &&
+        !pinnedSelection.value.has(props.getKeyFromItem(item))
+    );
+}
+
+const filteredItems = computed(() => searchedItems.value.filter((item) => !isHidden(item)));
+
+const inactiveCount = computed(() => {
+    if (!props.isItemInactive) return 0;
+    return searchedItems.value.filter(
+        (item) =>
+            props.isItemInactive!(item) && !pinnedSelection.value.has(props.getKeyFromItem(item))
+    ).length;
+});
+
+function formatItemDate(item: T): string {
+    const date = props.getDateForItem?.(item);
+    if (!date) return '';
+    const localDate = getLocalizedDayJs(date);
+    return localDate.year() === getLocalizedDayJs().year()
+        ? localDate.format('MMM D')
+        : localDate.format('MMM YYYY');
+}
 
 const showNoItem = computed(() => {
     if (!props.noItemLabel) return false;
@@ -84,6 +123,10 @@ function keyForRow(row: Row): string {
 
 function nameForRow(row: Row): string {
     return row.kind === 'none' ? (props.noItemLabel ?? '') : props.getNameForItem(row.item);
+}
+
+function dateForRow(row: Row): string {
+    return row.kind === 'none' ? '' : formatItemDate(row.item);
 }
 
 function toggleItem(id: string) {
@@ -149,10 +192,21 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                                 <span class="truncate" :title="nameForRow(option)">{{
                                     nameForRow(option)
                                 }}</span>
+                                <span
+                                    v-if="dateForRow(option)"
+                                    class="ml-auto shrink-0 pl-2 text-xs tabular-nums text-text-tertiary"
+                                    >{{ dateForRow(option) }}</span
+                                >
                             </ComboboxItem>
                         </ComboboxVirtualizer>
                     </ComboboxViewport>
                 </ComboboxContent>
+                <label
+                    v-if="inactiveLabel && (showInactive || inactiveCount > 0)"
+                    class="mt-1 flex items-center gap-2 border-t border-card-background-separator px-2 pt-2 text-sm text-text-secondary cursor-pointer">
+                    <Checkbox v-model:checked="showInactive" />
+                    {{ inactiveLabel }} ({{ inactiveCount }})
+                </label>
                 <div v-bind="resizeHandleProps"></div>
             </ComboboxRoot>
         </template>
