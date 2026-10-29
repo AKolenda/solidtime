@@ -263,47 +263,56 @@ function resetTexts() {
 
 watch([startDay, endDay], resetTexts, { immediate: true });
 
-const parsedStart = computed(() =>
-    parseDateInput(startText.value, organization?.value?.date_format)
-);
-const parsedEnd = computed(() => parseDateInput(endText.value, organization?.value?.date_format));
-
-function isAllowed(date: string | null): date is string {
-    return !!date && (props.allowFuture || date <= today.value.toString());
+// An untouched field keeps its date, so a preset ending in the future (This Month) can still
+// have its start edited.
+function fieldDate(
+    text: string,
+    day: ReturnType<typeof getLocalizedDayJs> | undefined
+): string | null {
+    if (day && text === formatInputDate(day)) return day.format('YYYY-MM-DD');
+    const date = parseDateInput(text, organization?.value?.date_format);
+    return date && (props.allowFuture || date <= today.value.toString()) ? date : null;
 }
+
+const typedStart = computed(() => fieldDate(startText.value, startDay.value));
+const typedEnd = computed(() => fieldDate(endText.value, endDay.value ?? startDay.value));
 
 const dateInputClass =
     'h-8 w-28 rounded-md border border-input-border bg-input-background px-2 text-sm tabular-nums text-text-primary focus:outline-none';
 
-function applyTexts(): boolean {
+function applyTexts(edited: 'start' | 'end'): boolean {
     if (
         startText.value === formatInputDate(startDay.value) &&
         endText.value === formatInputDate(endDay.value ?? startDay.value)
     ) {
         return true;
     }
-    let start = parsedStart.value;
-    let end = parsedEnd.value;
-    if (!isAllowed(start) || !isAllowed(end)) return false;
-    if (start > end) [start, end] = [end, start];
+    let start = typedStart.value;
+    let end = typedEnd.value;
+    if (!start || !end) return false;
+    // The edited date wins and the other one moves to meet it.
+    if (start > end) {
+        if (edited === 'start') end = start;
+        else start = end;
+    }
     emit('update:start', getLocalizedDayJsFromMinutes(start, 0).format());
     emit('update:end', getLocalizedDayJsFromMinutes(end, 0).endOf('day').format());
     return true;
 }
 
-function onTextBlur() {
-    if (!applyTexts()) resetTexts();
+function onTextBlur(edited: 'start' | 'end') {
+    if (!applyTexts(edited)) resetTexts();
 }
 
 function onStartEnter() {
-    if (applyTexts()) {
+    if (applyTexts('start')) {
         endInput.value?.focus();
         endInput.value?.select();
     }
 }
 
 function onEndEnter() {
-    if (applyTexts()) open.value = false;
+    if (applyTexts('end')) open.value = false;
 }
 
 function focusStartInput(event: Event) {
@@ -376,13 +385,10 @@ watch(open, (value) => {
                                     aria-label="Start date"
                                     data-testid="date_range_picker_start_input"
                                     :class="
-                                        twMerge(
-                                            dateInputClass,
-                                            !isAllowed(parsedStart) && 'border-red-500'
-                                        )
+                                        twMerge(dateInputClass, !typedStart && 'border-red-500')
                                     "
                                     @keydown.enter.prevent="onStartEnter"
-                                    @blur="onTextBlur" />
+                                    @blur="onTextBlur('start')" />
                                 <span class="text-text-tertiary">–</span>
                                 <input
                                     ref="endInput"
@@ -390,14 +396,9 @@ watch(open, (value) => {
                                     type="text"
                                     aria-label="End date"
                                     data-testid="date_range_picker_end_input"
-                                    :class="
-                                        twMerge(
-                                            dateInputClass,
-                                            !isAllowed(parsedEnd) && 'border-red-500'
-                                        )
-                                    "
+                                    :class="twMerge(dateInputClass, !typedEnd && 'border-red-500')"
                                     @keydown.enter.prevent="onEndEnter"
-                                    @blur="onTextBlur" />
+                                    @blur="onTextBlur('end')" />
                             </div>
                             <RangeCalendar
                                 v-model="modelValue"

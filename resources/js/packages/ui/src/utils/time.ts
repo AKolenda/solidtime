@@ -222,8 +222,14 @@ export function parseDateInput(
     value: string,
     format: DateFormat = 'point-separated-d-m-yyyy'
 ): string | null {
-    const pattern = dateFormatMap[format] ?? 'YYYY-MM-DD';
-    const patterns = [pattern, pattern.replace('DD', 'D').replace('MM', 'M'), 'YYYY-MM-DD'];
+    const pattern = (dateFormatMap[format] ?? 'YYYY-MM-DD').replace('DD', 'D').replace('MM', 'M');
+    const patterns = [
+        pattern,
+        pattern.replace('D', 'DD'),
+        pattern.replace('M', 'MM'),
+        pattern.replace('D', 'DD').replace('M', 'MM'),
+        'YYYY-MM-DD',
+    ];
     for (const candidate of patterns) {
         const date = dayjs(value.trim(), candidate, true);
         if (date.isValid()) return date.format('YYYY-MM-DD');

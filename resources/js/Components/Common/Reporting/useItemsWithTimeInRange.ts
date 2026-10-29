@@ -17,16 +17,24 @@ export function useItemsWithTimeInRange(startDate: Ref<string>, endDate: Ref<str
         sub_group: 'task' as const,
     }));
 
-    const { data } = useAggregatedTimeEntriesQuery('filter-items-in-range', params);
+    const { data, isPlaceholderData } = useAggregatedTimeEntriesQuery(
+        'filter-items-in-range',
+        params
+    );
+
+    // The previous range's data stands in while a new range loads; it doesn't describe this one.
+    const groupedData = computed(() =>
+        isPlaceholderData.value ? undefined : data.value?.data.grouped_data
+    );
 
     const projectIds = computed(() => {
-        const groups = data.value?.data.grouped_data;
+        const groups = groupedData.value;
         if (!groups) return undefined;
         return new Set(groups.flatMap((group) => (group.key ? [group.key] : [])));
     });
 
     const taskIds = computed(() => {
-        const groups = data.value?.data.grouped_data;
+        const groups = groupedData.value;
         if (!groups) return undefined;
         return new Set(
             groups.flatMap((group) =>
