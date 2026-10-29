@@ -130,6 +130,8 @@ test('test that the project filter virtualizes a long list (renders only a windo
     await goToReporting(page);
     await expect(page.getByRole('button', { name: 'Export' })).toBeVisible();
     await page.getByRole('button', { name: 'Projects' }).first().click();
+    // The projects have no time yet, so they're listed only with the out of range ones shown.
+    await page.getByText('Show outside date range (80)').click();
 
     // Only a small window of options is mounted, far fewer than the 80+ projects that exist.
     await expect(page.getByRole('option').first()).toBeVisible();
@@ -402,6 +404,8 @@ test('test that task multiselect search filters the option list', async ({ page,
     await page.getByRole('button', { name: 'Tasks' }).first().click();
 
     await page.getByPlaceholder('Search for a Task...').fill('Alpha');
+    // The tasks have no time yet, so they're listed only with the out of range ones shown.
+    await page.getByText('Show outside date range (1)').click();
 
     await expect(page.getByRole('option').filter({ hasText: task1Name })).toBeVisible();
     await expect(page.getByRole('option').filter({ hasText: task2Name })).not.toBeVisible();
