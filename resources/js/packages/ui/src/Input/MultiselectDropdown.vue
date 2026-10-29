@@ -200,13 +200,13 @@ const { setResizablePanel, resizablePanelStyle, resizeHandleProps } = useResizab
                             </ComboboxItem>
                         </ComboboxVirtualizer>
                     </ComboboxViewport>
+                    <label
+                        v-if="inactiveLabel && (showInactive || inactiveCount > 0)"
+                        class="mt-1 flex items-center gap-2 border-t border-card-background-separator px-2 pt-2 text-sm text-text-secondary cursor-pointer">
+                        <Checkbox v-model:checked="showInactive" />
+                        {{ inactiveLabel }} ({{ inactiveCount }})
+                    </label>
                 </ComboboxContent>
-                <label
-                    v-if="inactiveLabel && (showInactive || inactiveCount > 0)"
-                    class="mt-1 flex items-center gap-2 border-t border-card-background-separator px-2 pt-2 text-sm text-text-secondary cursor-pointer">
-                    <Checkbox v-model:checked="showInactive" />
-                    {{ inactiveLabel }} ({{ inactiveCount }})
-                </label>
                 <div v-bind="resizeHandleProps"></div>
             </ComboboxRoot>
         </template>
