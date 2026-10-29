@@ -47,6 +47,14 @@ function getNameForItem(item: TaskFilterOption) {
     return item.name;
 }
 
+function getDateForItem(item: TaskFilterOption) {
+    return item.lastActivityAt;
+}
+
+function isItemInactive(item: TaskFilterOption) {
+    return item.isDone;
+}
+
 const emit = defineEmits<{
     submit: [];
 }>();
@@ -81,6 +89,9 @@ watch(
         :items="taskOptions"
         :get-key-from-item="getKeyFromItem"
         :get-name-for-item="getNameForItem"
+        :get-date-for-item="getDateForItem"
+        :is-item-inactive="isItemInactive"
+        inactive-label="Show done"
         no-item-label="No Task"
         @submit="emit('submit')">
         <template #trigger>

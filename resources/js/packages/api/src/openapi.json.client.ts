@@ -387,6 +387,7 @@ const ProjectResource = z
         estimated_time: z.union([z.number(), z.null()]),
         spent_time: z.number().int(),
         is_public: z.boolean(),
+        last_activity_at: z.union([z.string(), z.null()]).optional(),
     })
     .passthrough();
 const ProjectStoreRequest = z
@@ -725,6 +726,7 @@ const TaskResource = z
         spent_time: z.number().int(),
         created_at: z.string(),
         updated_at: z.string(),
+        last_activity_at: z.union([z.string(), z.null()]).optional(),
     })
     .passthrough();
 const TaskStoreRequest = z

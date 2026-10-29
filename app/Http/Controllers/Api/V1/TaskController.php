@@ -65,7 +65,8 @@ class TaskController extends Controller
         $projectId = $request->input('project_id');
 
         $query = Task::query()
-            ->whereBelongsTo($organization, 'organization');
+            ->whereBelongsTo($organization, 'organization')
+            ->withMax('timeEntries', 'start');
 
         if ($projectId !== null) {
             $query->where('project_id', '=', $projectId);

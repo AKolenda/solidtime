@@ -13,6 +13,7 @@ use App\Models\ProjectMember;
 use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Service\BillableRateService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -81,6 +82,31 @@ class ProjectEndpointTest extends ApiEndpointTestAbstract
         $response->assertStatus(200);
         $ids = collect($response->json('data'))->pluck('id')->values()->toArray();
         $this->assertSame([$projectNewest->getKey(), $projectMiddle->getKey(), $projectOldest->getKey()], $ids);
+    }
+
+    public function test_index_endpoint_returns_start_of_latest_time_entry_as_last_activity_at(): void
+    {
+        // Arrange
+        $data = $this->createUserWithPermission([
+            'projects:view',
+            'projects:view:all',
+        ]);
+        $projectWithEntries = Project::factory()->forOrganization($data->organization)->create();
+        $projectWithoutEntries = Project::factory()->forOrganization($data->organization)->create();
+        TimeEntry::factory()->forOrganization($data->organization)->forProject($projectWithEntries)
+            ->start(Carbon::parse('2026-10-20 08:00:00', 'UTC'))->create();
+        TimeEntry::factory()->forOrganization($data->organization)->forProject($projectWithEntries)
+            ->start(Carbon::parse('2026-10-27 09:30:00', 'UTC'))->create();
+        Passport::actingAs($data->user);
+
+        // Act
+        $response = $this->getJson(route('api.v1.projects.index', [$data->organization->getKey()]));
+
+        // Assert
+        $response->assertStatus(200);
+        $lastActivityAt = collect($response->json('data'))->pluck('last_activity_at', 'id');
+        $this->assertSame('2026-10-27T09:30:00Z', $lastActivityAt[$projectWithEntries->getKey()]);
+        $this->assertNull($lastActivityAt[$projectWithoutEntries->getKey()]);
     }
 
     public function test_index_endpoint_pagination_returns_every_project_exactly_once_when_they_share_created_at(): void
