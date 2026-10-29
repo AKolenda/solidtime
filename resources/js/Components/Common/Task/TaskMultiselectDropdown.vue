@@ -14,9 +14,13 @@ const NO_TASK_ID = 'none';
 const props = withDefaults(
     defineProps<{
         projectIds?: string[];
+        // Tasks with time in the report's date range. When set, the others are hidden behind the
+        // toggle instead of the done ones.
+        idsInRange?: Set<string>;
     }>(),
     {
         projectIds: () => [],
+        idsInRange: undefined,
     }
 );
 
@@ -52,7 +56,8 @@ function getDateForItem(item: TaskFilterOption) {
 }
 
 function isItemInactive(item: TaskFilterOption) {
-    return item.isDone;
+    const idsInRange = props.idsInRange;
+    return idsInRange ? !item.taskIds.some((id) => idsInRange.has(id)) : item.isDone;
 }
 
 const emit = defineEmits<{
@@ -91,7 +96,7 @@ watch(
         :get-name-for-item="getNameForItem"
         :get-date-for-item="getDateForItem"
         :is-item-inactive="isItemInactive"
-        inactive-label="Show done"
+        :inactive-label="idsInRange ? 'Show outside date range' : 'Show done'"
         no-item-label="No Task"
         @submit="emit('submit')">
         <template #trigger>

@@ -5,6 +5,12 @@ import type { Project } from '@/packages/api/src';
 import { getCurrentUserId } from '@/utils/useUser';
 import { projectPickerStorageKey } from '@/packages/ui/src/Input/useResizableDropdown';
 
+const props = defineProps<{
+    // Projects with time in the report's date range. When set, the others are hidden behind the
+    // toggle instead of the archived ones.
+    idsInRange?: Set<string>;
+}>();
+
 const { projects } = useProjectsQuery();
 
 function getKeyFromItem(item: Project) {
@@ -20,7 +26,7 @@ function getDateForItem(item: Project) {
 }
 
 function isItemInactive(item: Project) {
-    return item.is_archived;
+    return props.idsInRange ? !props.idsInRange.has(item.id) : item.is_archived;
 }
 
 const emit = defineEmits<{
@@ -36,7 +42,7 @@ const emit = defineEmits<{
         :get-name-for-item="getNameForItem"
         :get-date-for-item="getDateForItem"
         :is-item-inactive="isItemInactive"
-        inactive-label="Show archived"
+        :inactive-label="idsInRange ? 'Show outside date range' : 'Show archived'"
         no-item-label="No Project"
         :resizable-storage-key="projectPickerStorageKey(getCurrentUserId())"
         @submit="emit('submit')">

@@ -20,6 +20,7 @@ import TagDropdown from '@/packages/ui/src/Tag/TagDropdown.vue';
 import { useTagsQuery } from '@/utils/useTagsQuery';
 import { useTagsStore } from '@/utils/useTags';
 import type { TagMatchType } from '@/types/reporting';
+import { useItemsWithTimeInRange } from '@/Components/Common/Reporting/useItemsWithTimeInRange';
 
 type TimeEntryRoundingType = 'up' | 'down' | 'nearest';
 
@@ -36,6 +37,11 @@ const roundingType = defineModel<TimeEntryRoundingType>('roundingType', { requir
 const roundingMinutes = defineModel<number>('roundingMinutes', { required: true });
 const startDate = defineModel<string>('startDate', { required: true });
 const endDate = defineModel<string>('endDate', { required: true });
+
+const { projectIds: projectIdsInRange, taskIds: taskIdsInRange } = useItemsWithTimeInRange(
+    startDate,
+    endDate
+);
 
 const { locked: billableRatesLocked, requestUpgrade } = useBillableRatesLock();
 
@@ -75,7 +81,10 @@ async function createTag(name: string) {
                             :icon="UserGroupIcon" />
                     </template>
                 </MemberMultiselectDropdown>
-                <ProjectMultiselectDropdown v-model="selectedProjects" @submit="emit('submit')">
+                <ProjectMultiselectDropdown
+                    v-model="selectedProjects"
+                    :ids-in-range="projectIdsInRange"
+                    @submit="emit('submit')">
                     <template #trigger>
                         <ReportingFilterBadge
                             :count="selectedProjects.length"
@@ -87,6 +96,7 @@ async function createTag(name: string) {
                 <TaskMultiselectDropdown
                     v-model="selectedTasks"
                     :project-ids="selectedProjects"
+                    :ids-in-range="taskIdsInRange"
                     @submit="emit('submit')">
                     <template #trigger="{ count, active }">
                         <ReportingFilterBadge

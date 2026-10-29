@@ -6,6 +6,7 @@ import {
     createClientViaApi,
     createTaskViaApi,
     createTimeEntryViaApi,
+    createTimeEntryOnDateViaApi,
     createTimeEntryWithTagViaApi,
     createBareTimeEntryViaApi,
 } from './utils/api';
@@ -105,6 +106,72 @@ test('test that project multiselect filters work on detailed reporting page', as
     // Verify only project1 entry is shown
     await expect(page.getByText(`Entry for ${project1}`).first()).toBeVisible();
     await expect(page.getByText(`Entry for ${project2}`).first()).not.toBeVisible();
+});
+
+function daysAgo(days: number): Date {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() - days);
+    date.setUTCHours(12, 0, 0, 0);
+    return date;
+}
+
+function isoDate(date: Date): string {
+    return date.toISOString().slice(0, 10);
+}
+
+test('test that the project filter lists only projects with time in the selected range', async ({
+    page,
+    ctx,
+}) => {
+    const seed = Math.floor(Math.random() * 10000);
+    const recent = await createProjectViaApi(ctx, { name: `InRange ${seed}` });
+    const old = await createProjectViaApi(ctx, { name: `OutOfRange ${seed}` });
+    await createProjectViaApi(ctx, { name: `NoTime ${seed}` });
+    await createTimeEntryViaApi(ctx, { duration: '1h', projectId: recent.id });
+    await createTimeEntryOnDateViaApi(ctx, {
+        date: daysAgo(60),
+        duration: '1h',
+        projectId: old.id,
+    });
+
+    await goToReportingDetailed(page);
+    await page.getByRole('button', { name: 'Projects' }).first().click();
+    await page.getByPlaceholder('Search for a Project...').fill(String(seed));
+
+    await expect(page.getByRole('option').filter({ hasText: `InRange ${seed}` })).toBeVisible();
+    await expect(page.getByRole('option').filter({ hasText: `OutOfRange ${seed}` })).toHaveCount(0);
+    await expect(page.getByRole('option').filter({ hasText: `NoTime ${seed}` })).toHaveCount(0);
+
+    await page.getByText('Show outside date range (2)').click();
+    await expect(page.getByRole('option').filter({ hasText: `OutOfRange ${seed}` })).toBeVisible();
+    await expect(page.getByRole('option').filter({ hasText: `NoTime ${seed}` })).toBeVisible();
+});
+
+test('test that a custom date range can be typed', async ({ page, ctx }) => {
+    const seed = Math.floor(Math.random() * 10000);
+    const project = await createProjectViaApi(ctx, { name: `Typed Range ${seed}` });
+    const entryDate = daysAgo(60);
+    await createTimeEntryOnDateViaApi(ctx, {
+        date: entryDate,
+        duration: '1h',
+        description: `Typed range entry ${seed}`,
+        projectId: project.id,
+    });
+
+    await goToReportingDetailed(page);
+    await expect(page.getByText(`Typed range entry ${seed}`)).toHaveCount(0);
+
+    await page.getByTestId('date_range_picker_display').click();
+    const startInput = page.getByTestId('date_range_picker_start_input');
+    await expect(startInput).toBeFocused();
+    await page.keyboard.type(isoDate(daysAgo(61)));
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('date_range_picker_end_input')).toBeFocused();
+    await page.keyboard.type(isoDate(daysAgo(59)));
+    await Promise.all([page.keyboard.press('Enter'), waitForDetailedReportingUpdate(page)]);
+
+    await expect(startInput).not.toBeVisible();
+    await expect(page.getByText(`Typed range entry ${seed}`).first()).toBeVisible();
 });
 
 // ──────────────────────────────────────────────────

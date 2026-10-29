@@ -7,7 +7,14 @@ import { CalendarIcon, Check } from '@lucide/vue';
 import { computed, ref, inject, type ComputedRef, watch } from 'vue';
 import { twMerge } from 'tailwind-merge';
 import DateRangeNavigator from './DateRangeNavigator.vue';
-import { getLocalizedDayJs, firstDayIndex, type WeekStartDay } from '@/packages/ui/src/utils/time';
+import {
+    getLocalizedDayJs,
+    getLocalizedDayJsFromMinutes,
+    firstDayIndex,
+    formatDate,
+    parseDateInput,
+    type WeekStartDay,
+} from '@/packages/ui/src/utils/time';
 import { getDateRangeLabel, shiftDateRange, type DateRangeDirection } from '../utils/dateRange';
 import { type Organization } from '@/packages/api/src';
 import { getUserTimezone } from '@/packages/ui/src/utils/settings';
@@ -239,8 +246,85 @@ function navigate(direction: DateRangeDirection) {
     emit('submit');
 }
 
+// Typed dates, so a custom range doesn't need clicking through months in the calendar.
+const startText = ref('');
+const endText = ref('');
+const startInput = ref<HTMLInputElement | null>(null);
+const endInput = ref<HTMLInputElement | null>(null);
+
+function formatInputDate(day: ReturnType<typeof getLocalizedDayJs> | undefined) {
+    return day ? formatDate(day.format('YYYY-MM-DD'), organization?.value?.date_format) : '';
+}
+
+function resetTexts() {
+    startText.value = formatInputDate(startDay.value);
+    endText.value = formatInputDate(endDay.value ?? startDay.value);
+}
+
+watch([startDay, endDay], resetTexts, { immediate: true });
+
+// An untouched field keeps its date, so a preset ending in the future (This Month) can still
+// have its start edited.
+function fieldDate(
+    text: string,
+    day: ReturnType<typeof getLocalizedDayJs> | undefined
+): string | null {
+    if (day && text === formatInputDate(day)) return day.format('YYYY-MM-DD');
+    const date = parseDateInput(text, organization?.value?.date_format);
+    return date && (props.allowFuture || date <= today.value.toString()) ? date : null;
+}
+
+const typedStart = computed(() => fieldDate(startText.value, startDay.value));
+const typedEnd = computed(() => fieldDate(endText.value, endDay.value ?? startDay.value));
+
+const dateInputClass =
+    'h-8 w-28 rounded-md border border-input-border bg-input-background px-2 text-sm tabular-nums text-text-primary focus:outline-none';
+
+function applyTexts(edited: 'start' | 'end'): boolean {
+    if (
+        startText.value === formatInputDate(startDay.value) &&
+        endText.value === formatInputDate(endDay.value ?? startDay.value)
+    ) {
+        return true;
+    }
+    let start = typedStart.value;
+    let end = typedEnd.value;
+    if (!start || !end) return false;
+    // The edited date wins and the other one moves to meet it.
+    if (start > end) {
+        if (edited === 'start') end = start;
+        else start = end;
+    }
+    emit('update:start', getLocalizedDayJsFromMinutes(start, 0).format());
+    emit('update:end', getLocalizedDayJsFromMinutes(end, 0).endOf('day').format());
+    return true;
+}
+
+function onTextBlur(edited: 'start' | 'end') {
+    if (!applyTexts(edited)) resetTexts();
+}
+
+function onStartEnter() {
+    if (applyTexts('start')) {
+        endInput.value?.focus();
+        endInput.value?.select();
+    }
+}
+
+function onEndEnter() {
+    if (applyTexts('end')) open.value = false;
+}
+
+function focusStartInput(event: Event) {
+    event.preventDefault();
+    startInput.value?.focus();
+    startInput.value?.select();
+}
+
 watch(open, (value) => {
-    if (value === false) {
+    if (value) {
+        resetTexts();
+    } else {
         emit('submit');
     }
 });
@@ -268,7 +352,7 @@ watch(open, (value) => {
                         <span class="min-w-0 truncate">{{ displayLabel }}</span>
                     </Button>
                 </PopoverTrigger>
-                <PopoverContent class="w-auto p-0">
+                <PopoverContent class="w-auto p-0" @open-auto-focus="focusStartInput">
                     <div class="flex divide-x divide-border-secondary">
                         <div
                             class="text-text-primary text-sm flex flex-col space-y-0.5 items-start py-2 px-2">
@@ -293,9 +377,31 @@ watch(open, (value) => {
                             </Button>
                         </div>
                         <div class="pl-2">
+                            <div class="flex items-center gap-2 px-3 pt-3">
+                                <input
+                                    ref="startInput"
+                                    v-model="startText"
+                                    type="text"
+                                    aria-label="Start date"
+                                    data-testid="date_range_picker_start_input"
+                                    :class="
+                                        twMerge(dateInputClass, !typedStart && 'border-red-500')
+                                    "
+                                    @keydown.enter.prevent="onStartEnter"
+                                    @blur="onTextBlur('start')" />
+                                <span class="text-text-tertiary">–</span>
+                                <input
+                                    ref="endInput"
+                                    v-model="endText"
+                                    type="text"
+                                    aria-label="End date"
+                                    data-testid="date_range_picker_end_input"
+                                    :class="twMerge(dateInputClass, !typedEnd && 'border-red-500')"
+                                    @keydown.enter.prevent="onEndEnter"
+                                    @blur="onTextBlur('end')" />
+                            </div>
                             <RangeCalendar
                                 v-model="modelValue"
-                                initial-focus
                                 :number-of-months="2"
                                 :max-value="allowFuture ? undefined : today"
                                 :week-starts-on="weekStartsOn" />

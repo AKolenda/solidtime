@@ -8,6 +8,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import weekOfYear from 'dayjs/plugin/weekOfYear';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 import parse from 'parse-duration';
 
 import { getUserTimezone, getWeekStart } from './settings';
@@ -77,6 +78,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(updateLocale);
 dayjs.extend(weekOfYear);
+dayjs.extend(customParseFormat);
 
 export function getDayJsInstance() {
     dayjs.updateLocale('en', {
@@ -210,6 +212,29 @@ export function formatDate(date: string, format: DateFormat = 'point-separated-d
         console.warn('Date contains timezone information, use formatDateLocalized instead');
     }
     return getDayJsInstance()(date).format(dateFormatMap[format]);
+}
+
+/*
+ * Parses a date typed in the given format, with or without leading zeros, or as YYYY-MM-DD.
+ * Returns it as 'YYYY-MM-DD', or null when it isn't a real date.
+ */
+export function parseDateInput(
+    value: string,
+    format: DateFormat = 'point-separated-d-m-yyyy'
+): string | null {
+    const pattern = (dateFormatMap[format] ?? 'YYYY-MM-DD').replace('DD', 'D').replace('MM', 'M');
+    const patterns = [
+        pattern,
+        pattern.replace('D', 'DD'),
+        pattern.replace('M', 'MM'),
+        pattern.replace('D', 'DD').replace('M', 'MM'),
+        'YYYY-MM-DD',
+    ];
+    for (const candidate of patterns) {
+        const date = dayjs(value.trim(), candidate, true);
+        if (date.isValid()) return date.format('YYYY-MM-DD');
+    }
+    return null;
 }
 
 /*
