@@ -74,22 +74,20 @@ const searchedItems = computed(() => {
     );
 });
 
+// Selected items always stay visible, so a filter in use can't be hidden by the toggle.
+function isHiddenInactive(item: T): boolean {
+    return !!props.isItemInactive?.(item) && !model.value.includes(props.getKeyFromItem(item));
+}
+
 function isHidden(item: T): boolean {
-    return (
-        !showInactive.value &&
-        !!props.isItemInactive?.(item) &&
-        !pinnedSelection.value.has(props.getKeyFromItem(item))
-    );
+    return !showInactive.value && isHiddenInactive(item);
 }
 
 const filteredItems = computed(() => searchedItems.value.filter((item) => !isHidden(item)));
 
 const inactiveCount = computed(() => {
     if (!props.isItemInactive) return 0;
-    return searchedItems.value.filter(
-        (item) =>
-            props.isItemInactive!(item) && !pinnedSelection.value.has(props.getKeyFromItem(item))
-    ).length;
+    return searchedItems.value.filter(isHiddenInactive).length;
 });
 
 function formatItemDate(item: T): string {

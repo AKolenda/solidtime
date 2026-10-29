@@ -98,9 +98,12 @@ describe('TaskMultiselectDropdown', () => {
             { id: 'i', name: 'Inspection', project_id: 'p', is_done: false, last_activity_at: null }
         );
 
-        const wrapper = mount(TaskMultiselectDropdown, {
+        const wrapper: ReturnType<typeof mount> = mount(TaskMultiselectDropdown, {
             attachTo: document.body,
-            props: { modelValue: [] },
+            props: {
+                modelValue: [],
+                'onUpdate:modelValue': (value: string[]) => wrapper.setProps({ modelValue: value }),
+            },
             slots: { trigger: '<button>Tasks</button>' },
         });
 
@@ -128,6 +131,17 @@ describe('TaskMultiselectDropdown', () => {
             'AnodizeMar 2025',
             'Inspection',
         ]);
+
+        const deburr = [...document.body.querySelectorAll<HTMLElement>('[role="option"]')].find(
+            (option) => option.textContent?.startsWith('Deburr')
+        );
+        deburr!.click();
+        await nextTick();
+        toggle!.click();
+        await nextTick();
+
+        // a selected done task stays listed after hiding done ones again
+        expect(optionNames()).toContain('DeburrOct 28');
 
         wrapper.unmount();
         taskFixtures.splice(0, taskFixtures.length, ...original);
