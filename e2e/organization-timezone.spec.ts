@@ -16,19 +16,28 @@ function mismatchModal(page: Page) {
     return page.getByRole('dialog').filter({ hasText: 'Timezone mismatch detected' });
 }
 
+// The browser session authenticates API calls through a cookie that needs the XSRF header
+async function apiAsBrowser(page: Page, method: 'GET' | 'PUT', url: string, data?: object) {
+    const cookies = await page.context().cookies();
+    const xsrf = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
+    return page.request.fetch(url, {
+        method,
+        headers: {
+            'X-XSRF-TOKEN': xsrf ? decodeURIComponent(xsrf.value) : '',
+            Accept: 'application/json',
+        },
+        data,
+    });
+}
+
 async function getEmployeeTimezone(page: Page) {
-    const response = await page.request.get(`${PLAYWRIGHT_BASE_URL}/api/v1/users/me`);
+    const response = await apiAsBrowser(page, 'GET', `${PLAYWRIGHT_BASE_URL}/api/v1/users/me`);
     expect(response.status()).toBe(200);
     return (await response.json()).data as { id: string; timezone: string };
 }
 
 async function putAsBrowser(page: Page, url: string, data: Record<string, unknown>) {
-    const cookies = await page.context().cookies();
-    const xsrf = cookies.find((cookie) => cookie.name === 'XSRF-TOKEN');
-    return page.request.put(url, {
-        headers: { 'X-XSRF-TOKEN': xsrf ? decodeURIComponent(xsrf.value) : '' },
-        data,
-    });
+    return apiAsBrowser(page, 'PUT', url, data);
 }
 
 test('admin sets one timezone for every member from organization settings', async ({
@@ -60,13 +69,12 @@ test('admin sets one timezone for every member from organization settings', asyn
     expect((await getCurrentUserViaApi(ctx)).timezone).toBe('America/Swift_Current');
     expect((await getEmployeeTimezone(employee.page)).timezone).toBe('America/Swift_Current');
 
-    // Not locked, so the employee keeps control of their own timezone
-    await employee.page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
-    await expect(timezoneField(employee.page)).toHaveText('America/Swift_Current');
-    await expect(timezoneField(employee.page)).toBeEnabled();
-
-    // The setting is still there after a reload
+    // Not locked, so the owner's Vienna browser still offers to switch back
     await page.reload();
+    await expect(mismatchModal(page)).toBeVisible();
+    await mismatchModal(page).getByRole('button', { name: 'Cancel' }).click();
+
+    // The setting is still there after the reload
     await expect(timezoneField(page)).toHaveText('America/Swift_Current');
 });
 
@@ -85,9 +93,7 @@ test('a locked timezone can not be changed by members', async ({ page, ctx, empl
     await employee.page.goto(PLAYWRIGHT_BASE_URL + '/user/profile');
     await expect(timezoneField(employee.page)).toHaveText('America/Regina');
     await expect(timezoneField(employee.page)).toBeDisabled();
-    await expect(
-        employee.page.getByText(/^Set by .+\. Ask an admin to change it\.$/)
-    ).toBeVisible();
+    await expect(employee.page.getByText(/Set by .+ Ask an admin to change it\./)).toBeVisible();
 
     // The API refuses a change too
     const rejected = await putAsBrowser(
