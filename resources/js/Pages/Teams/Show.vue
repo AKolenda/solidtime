@@ -7,6 +7,7 @@ import type { Organization } from '@/types/models';
 import type { Permissions } from '@/types/jetstream';
 import OrganizationBillableRate from '@/Pages/Teams/Partials/OrganizationBillableRate.vue';
 import OrganizationFormatSettings from '@/Pages/Teams/Partials/OrganizationFormatSettings.vue';
+import OrganizationTimezoneSettings from '@/Pages/Teams/Partials/OrganizationTimezoneSettings.vue';
 import OrganizationTimeEntrySettings from '@/Pages/Teams/Partials/OrganizationTimeEntrySettings.vue';
 import OrganizationShopReportSettings from '@/Pages/Teams/Partials/OrganizationShopReportSettings.vue';
 import OrganizationTrial from '@/Pages/Teams/Partials/OrganizationTrial.vue';
@@ -52,6 +53,9 @@ onMounted(async () => {
 
                     <SectionBorder v-if="permissions.canUpdateTeam" />
                     <OrganizationFormatSettings v-if="permissions.canUpdateTeam" :team="team" />
+
+                    <SectionBorder v-if="permissions.canUpdateTeam" />
+                    <OrganizationTimezoneSettings v-if="permissions.canUpdateTeam" />
 
                     <SectionBorder v-if="permissions.canUpdateTeam" />
                     <OrganizationTimeEntrySettings v-if="permissions.canUpdateTeam" />

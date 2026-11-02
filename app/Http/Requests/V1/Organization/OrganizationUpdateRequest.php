@@ -65,6 +65,19 @@ class OrganizationUpdateRequest extends BaseFormRequest
             'shop_report_enabled' => [
                 'boolean',
             ],
+            // Timezone that admins can set for every member of the organization, null removes it
+            'timezone' => [
+                'nullable',
+                'timezone:all',
+            ],
+            // Stop members from changing their own timezone (requires a timezone)
+            'timezone_locked' => [
+                'boolean',
+            ],
+            // Set the organization timezone on every member now
+            'apply_timezone_to_members' => [
+                'boolean',
+            ],
             'shop_report_logo' => [
                 'nullable',
                 'string',
@@ -154,6 +167,21 @@ class OrganizationUpdateRequest extends BaseFormRequest
     public function getTimeEntryAutoStopHours(): ?int
     {
         return $this->input('time_entry_auto_stop_hours') !== null ? (int) $this->input('time_entry_auto_stop_hours') : null;
+    }
+
+    public function getTimezone(): ?string
+    {
+        return $this->input('timezone') !== null ? (string) $this->input('timezone') : null;
+    }
+
+    public function getTimezoneLocked(): ?bool
+    {
+        return $this->has('timezone_locked') ? $this->boolean('timezone_locked') : null;
+    }
+
+    public function getApplyTimezoneToMembers(): bool
+    {
+        return $this->boolean('apply_timezone_to_members');
     }
 
     public function getShopReportEnabled(): ?bool

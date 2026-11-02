@@ -46,6 +46,7 @@ class ShareInertiaData
                         'current_team_id' => $user->current_team_id,
                         'profile_photo_path' => $user->profile_photo_path,
                         'timezone' => $user->timezone,
+                        'timezone_locked' => $user->getTimezoneLockingOrganization() !== null,
                         'week_start' => $user->week_start,
                         'profile_photo_url' => $user->profile_photo_url,
                         'two_factor_enabled' => Features::enabled(Features::twoFactorAuthentication())

@@ -64,6 +64,10 @@ class OrganizationResource extends BaseResource
             'breaks_enabled' => $this->resource->breaks_enabled,
             /** Running time entries are stopped automatically after this many hours (null = never) */
             'time_entry_auto_stop_hours' => $this->resource->time_entry_auto_stop_hours,
+            /** Timezone set by admins for every member (null = members choose their own) */
+            'timezone' => $this->resource->timezone,
+            /** Members can not change their own timezone */
+            'timezone_locked' => $this->resource->timezone_locked,
             /** Use the shop-specific single-project PDF layout */
             'shop_report_enabled' => $this->resource->shop_report_enabled,
             /** Data URL for the report logo */

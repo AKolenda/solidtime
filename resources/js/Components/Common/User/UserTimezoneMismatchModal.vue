@@ -30,7 +30,9 @@ async function handleUpdate(timezone: string) {
 </script>
 
 <template>
+    <!-- An admin set this user's timezone, so there is nothing for them to switch -->
     <TimezoneMismatchModal
+        v-if="!page.props.auth.user.timezone_locked"
         v-model:show="show"
         :saving="updateUser.isPending.value"
         @update="handleUpdate" />

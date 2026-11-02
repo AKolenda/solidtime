@@ -276,4 +276,16 @@ class User extends Authenticatable implements AuditableContract, FilamentUser, M
             $query->whereKey($organization->getKey());
         });
     }
+
+    /**
+     * The organization that sets this user's timezone, if one of their organizations locked it.
+     */
+    public function getTimezoneLockingOrganization(): ?Organization
+    {
+        /** @var Organization|null $organization */
+        $organization = $this->organizations
+            ->first(fn (Organization $organization): bool => $organization->timezone_locked && $organization->timezone !== null);
+
+        return $organization;
+    }
 }

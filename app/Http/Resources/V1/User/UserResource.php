@@ -34,6 +34,8 @@ class UserResource extends BaseResource
             'profile_photo_url' => $this->resource->profile_photo_url,
             /** Timezone (f.e. Europe/Berlin or America/New_York) */
             'timezone' => $this->resource->timezone,
+            /** Name of the organization that set the timezone, the user can not change it while this is set */
+            'timezone_locked_by' => $this->resource->getTimezoneLockingOrganization()?->name,
             /** @var Weekday $week_start Starting day of the week */
             'week_start' => $this->resource->week_start->value,
             /** Whether to email the user when a time entry has been running for more than 8 hours */
