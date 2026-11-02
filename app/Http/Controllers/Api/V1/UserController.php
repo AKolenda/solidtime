@@ -83,6 +83,16 @@ class UserController extends Controller
             throw new AuthorizationException;
         }
 
+        // Check before anything else changes, so a refused update leaves the photo untouched
+        if ($request->getTimezone() !== null && $request->getTimezone() !== $user->timezone) {
+            $lockingOrganization = $user->getTimezoneLockingOrganization();
+            if ($lockingOrganization !== null) {
+                throw ValidationException::withMessages([
+                    'timezone' => __('Your timezone is set by :organization. Ask an admin to change it.', ['organization' => $lockingOrganization->name]),
+                ]);
+            }
+        }
+
         if ($request->hasPhotoKey()) {
             $photoDisk = (string) config('filesystems.public');
             $previousPhotoPath = $user->profile_photo_path;
@@ -117,13 +127,7 @@ class UserController extends Controller
             $user->name = $request->getName();
         }
 
-        if ($request->getTimezone() !== null && $request->getTimezone() !== $user->timezone) {
-            $lockingOrganization = $user->getTimezoneLockingOrganization();
-            if ($lockingOrganization !== null) {
-                throw ValidationException::withMessages([
-                    'timezone' => __('Your timezone is set by :organization. Ask an admin to change it.', ['organization' => $lockingOrganization->name]),
-                ]);
-            }
+        if ($request->getTimezone() !== null) {
             $user->timezone = $request->getTimezone();
         }
 
