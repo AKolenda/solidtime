@@ -93,6 +93,8 @@ export interface User {
     two_factor_recovery_codes?: string | null;
     two_factor_confirmed_at: string | null;
     timezone: string;
+    // true when one of the user's organizations sets their timezone for them
+    timezone_locked?: boolean;
     week_start: string;
     // mutators
     profile_photo_url: string;

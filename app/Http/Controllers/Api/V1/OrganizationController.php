@@ -88,6 +88,15 @@ class OrganizationController extends Controller
         if ($request->getShopReportEnabled() !== null) {
             $organization->shop_report_enabled = $request->getShopReportEnabled();
         }
+        if ($request->has('timezone')) {
+            $organization->timezone = $request->getTimezone();
+        }
+        if ($request->getTimezoneLocked() !== null) {
+            $organization->timezone_locked = $request->getTimezoneLocked();
+        }
+        if ($organization->timezone === null) {
+            $organization->timezone_locked = false;
+        }
         if ($request->has('shop_report_logo')) {
             $organization->shop_report_logo = $request->getShopReportLogo();
         }
@@ -99,6 +108,11 @@ class OrganizationController extends Controller
 
         if ($oldBillableRate !== $organization->billable_rate) {
             $billableRateService->updateTimeEntriesBillableRateForOrganization($organization);
+        }
+
+        // A locked timezone only makes sense if everyone is on it, so locking always applies it
+        if ($organization->timezone_locked || $request->getApplyTimezoneToMembers()) {
+            app(OrganizationService::class)->applyTimezoneToMembers($organization);
         }
 
         return new OrganizationResource($organization, true);

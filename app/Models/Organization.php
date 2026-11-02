@@ -37,6 +37,8 @@ use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
  * @property bool $shop_report_enabled
  * @property string|null $shop_report_logo
  * @property int|null $time_entry_auto_stop_hours
+ * @property string|null $timezone
+ * @property bool $timezone_locked
  * @property User $owner
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -76,6 +78,8 @@ class Organization extends Model implements AuditableContract
         'breaks_enabled' => 'boolean',
         'shop_report_enabled' => 'boolean',
         'time_entry_auto_stop_hours' => 'integer',
+        'timezone' => 'string',
+        'timezone_locked' => 'boolean',
         'number_format' => NumberFormat::class,
         'currency_format' => CurrencyFormat::class,
         'date_format' => DateFormat::class,

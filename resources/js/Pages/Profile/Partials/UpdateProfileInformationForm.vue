@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import ActionMessage from '@/Components/ActionMessage.vue';
 import FormSection from '@/Components/FormSection.vue';
-import { Field, FieldError, FieldLabel } from '@/packages/ui/src/field';
+import { Field, FieldDescription, FieldError, FieldLabel } from '@/packages/ui/src/field';
 import { Button } from '@/packages/ui/src/Buttons';
 import PrimaryButton from '@/packages/ui/src/Buttons/PrimaryButton.vue';
 import SecondaryButton from '@/packages/ui/src/Buttons/SecondaryButton.vue';
@@ -53,6 +53,7 @@ watch(
 
 const isUserLoaded = computed(() => user.value !== undefined);
 const isSaveDisabled = computed(() => !isUserLoaded.value || updateUser.isPending.value);
+const timezoneLockedBy = computed(() => user.value?.timezone_locked_by ?? null);
 const pendingEmail = computed(() => user.value?.pending_email ?? null);
 const hasUploadedPhoto = computed(() => {
     const url = user.value?.profile_photo_url;
@@ -75,7 +76,9 @@ function buildPayload(): UpdateUserBody {
         body.email = email.value.trim();
     }
 
-    if (timezone.value !== user.value.timezone) body.timezone = timezone.value;
+    if (!user.value.timezone_locked_by && timezone.value !== user.value.timezone) {
+        body.timezone = timezone.value;
+    }
     if (weekStart.value !== user.value.week_start) {
         body.week_start = weekStart.value as UpdateUserBody['week_start'];
     }
@@ -288,7 +291,13 @@ onBeforeUnmount(() => {
             <!-- Timezone -->
             <Field class="col-span-6 sm:col-span-4">
                 <FieldLabel for="timezone">Timezone</FieldLabel>
-                <TimezoneCombobox id="timezone" v-model="timezone" :disabled="!isUserLoaded" />
+                <TimezoneCombobox
+                    id="timezone"
+                    v-model="timezone"
+                    :disabled="!isUserLoaded || !!timezoneLockedBy" />
+                <FieldDescription v-if="timezoneLockedBy">
+                    Set by {{ timezoneLockedBy }}. Ask an admin to change it.
+                </FieldDescription>
                 <FieldError v-if="fieldErrors.timezone">{{ fieldErrors.timezone }}</FieldError>
             </Field>
 

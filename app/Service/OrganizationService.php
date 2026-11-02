@@ -12,6 +12,7 @@ use App\Enums\Role;
 use App\Enums\TimeFormat;
 use App\Models\Organization;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 
 class OrganizationService
 {
@@ -64,5 +65,29 @@ class OrganizationService
         );
 
         return $organization;
+    }
+
+    /**
+     * Sets the organization timezone on every member of the organization.
+     * The timezone belongs to the user, so this also changes it for their other organizations.
+     */
+    public function applyTimezoneToMembers(Organization $organization): void
+    {
+        if ($organization->timezone === null) {
+            return;
+        }
+
+        $users = User::query()
+            ->whereHas('organizations', function (Builder $query) use ($organization): void {
+                /** @var Builder<Organization> $query */
+                $query->whereKey($organization->getKey());
+            })
+            ->where('timezone', '!=', $organization->timezone)
+            ->get();
+
+        foreach ($users as $user) {
+            $user->timezone = $organization->timezone;
+            $user->save();
+        }
     }
 }

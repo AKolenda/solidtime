@@ -48,6 +48,9 @@ class MemberService
             $member->save();
 
             $user->currentOrganization()->associate($organization);
+            if ($organization->timezone_locked && $organization->timezone !== null) {
+                $user->timezone = $organization->timezone;
+            }
             $user->save();
         });
         $this->mergePlaceholderMembersIntoExistingMember($member, $organization, $user);

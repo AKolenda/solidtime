@@ -21,6 +21,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -80,6 +81,16 @@ class UserController extends Controller
     {
         if ($user->getKey() !== $this->user()->getKey()) {
             throw new AuthorizationException;
+        }
+
+        // Check before anything else changes, so a refused update leaves the photo untouched
+        if ($request->getTimezone() !== null && $request->getTimezone() !== $user->timezone) {
+            $lockingOrganization = $user->getTimezoneLockingOrganization();
+            if ($lockingOrganization !== null) {
+                throw ValidationException::withMessages([
+                    'timezone' => __('Your timezone is set by :organization. Ask an admin to change it.', ['organization' => $lockingOrganization->name]),
+                ]);
+            }
         }
 
         if ($request->hasPhotoKey()) {
