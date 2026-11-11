@@ -181,12 +181,25 @@ function isRowSelected(row: DetailedReportRow): boolean {
     return row.collapsed_ids.every((id) => selectedIds.value.has(id));
 }
 
-/** The original, uncollapsed entries a displayed row stands for. */
-const entriesById = computed(() => new Map(props.timeEntries.map((entry) => [entry.id, entry])));
+/**
+ * The original, uncollapsed entries each displayed row stands for. Built once per data
+ * change so every row gets the same array on each render: resizing a column re-renders
+ * this component on every mouse move, and a fresh array would re-render every row and
+ * all of its editable cells with it.
+ */
+const entriesByRow = computed(() => {
+    const entriesById = new Map(props.timeEntries.map((entry) => [entry.id, entry]));
+    return new Map(
+        rows.value.map((row) => [
+            row.id,
+            row.collapsed_ids
+                .map((id) => entriesById.get(id))
+                .filter((entry): entry is TimeEntry => !!entry),
+        ])
+    );
+});
 function entriesOfRow(row: DetailedReportRow): TimeEntry[] {
-    return row.collapsed_ids
-        .map((id) => entriesById.value.get(id))
-        .filter((entry): entry is TimeEntry => !!entry);
+    return entriesByRow.value.get(row.id) ?? [];
 }
 
 function setRowSelected(row: DetailedReportRow, selected: boolean) {
