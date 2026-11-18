@@ -91,7 +91,10 @@ const runningEntries = computed(() => runningResponse.value?.data ?? []);
 const now = useNow({ interval: 1000 });
 function runningDuration(entry: TimeEntry): string {
     return formatDuration(
-        Math.max(0, Math.floor((now.value.getTime() - getLocalizedDayJs(entry.start).valueOf()) / 1000))
+        Math.max(
+            0,
+            Math.floor((now.value.getTime() - getLocalizedDayJs(entry.start).valueOf()) / 1000)
+        )
     );
 }
 
@@ -220,7 +223,8 @@ const gridTemplate = computed(
                         <span class="relative flex h-2 w-2 shrink-0">
                             <span
                                 class="absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-60 motion-safe:animate-ping"></span>
-                            <span class="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
+                            <span
+                                class="relative inline-flex h-2 w-2 rounded-full bg-green-500"></span>
                         </span>
                         Running
                     </div>
