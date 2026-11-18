@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { debounceFilter, useNow, useStorage } from '@vueuse/core';
 import { useQuery, useQueryClient } from '@tanstack/vue-query';
 import { StopIcon } from '@heroicons/vue/20/solid';
@@ -63,7 +63,11 @@ const filterParams = computed(() => ({
     offset: (currentPage.value - 1) * pageSize,
 }));
 
-const { data: timeEntryResponse, isLoading } = useTimeEntriesReportQuery(filterParams);
+const {
+    data: timeEntryResponse,
+    isLoading,
+    refetch: refetchFinished,
+} = useTimeEntriesReportQuery(filterParams);
 const timeEntries = computed(() => timeEntryResponse.value?.data ?? []);
 const totalEntries = computed(() => timeEntryResponse.value?.meta?.total ?? 0);
 
@@ -91,6 +95,14 @@ const { data: runningResponse } = useQuery({
     refetchInterval: 30000,
 });
 const runningEntries = computed(() => runningResponse.value?.data ?? []);
+
+// A timer stopped elsewhere drops out of the running list, so pull it into the finished list
+watch(runningEntries, (current, previous) => {
+    const currentIds = new Set(current.map((entry) => entry.id));
+    if (previous.some((entry) => !currentIds.has(entry.id))) {
+        refetchFinished();
+    }
+});
 
 const now = useNow({ interval: 1000 });
 function runningDuration(entry: TimeEntry): string {
