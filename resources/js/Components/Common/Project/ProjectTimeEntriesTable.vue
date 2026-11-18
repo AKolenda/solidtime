@@ -98,6 +98,15 @@ function runningDuration(entry: TimeEntry): string {
     );
 }
 
+// Employees can not load member names, so their own timer is "your timer"
+function stopLabel(entry: TimeEntry): string {
+    if (entry.member_id === getCurrentMembershipId()) {
+        return 'Stop your timer';
+    }
+    const name = memberNames.value.get(entry.user_id);
+    return name ? `Stop ${name}'s timer` : 'Stop timer';
+}
+
 function canStop(entry: TimeEntry): boolean {
     return entry.member_id === getCurrentMembershipId()
         ? canUpdateOwnTimeEntries()
@@ -246,8 +255,8 @@ const gridTemplate = computed(
                             v-if="canStop(entry)"
                             type="button"
                             class="rounded p-1.5 text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            :title="`Stop ${memberNames.get(entry.user_id) ?? ''}'s timer`"
-                            :aria-label="`Stop ${memberNames.get(entry.user_id) ?? ''}'s timer`"
+                            :title="stopLabel(entry)"
+                            :aria-label="stopLabel(entry)"
                             @click="askToStop(entry)">
                             <StopIcon class="w-4 h-4" />
                         </button>
@@ -291,7 +300,7 @@ const gridTemplate = computed(
         <AlertDialogContent>
             <AlertDialogHeader>
                 <AlertDialogTitle>
-                    Stop {{ stopCandidate ? memberNames.get(stopCandidate.user_id) : '' }}'s timer?
+                    {{ stopCandidate ? stopLabel(stopCandidate) : 'Stop timer' }}?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                     The running time entry ends now. You can correct the times afterwards in the
