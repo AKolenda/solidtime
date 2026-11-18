@@ -18,7 +18,7 @@ import { useTimeEntriesReportQuery } from '@/utils/useTimeEntriesReportQuery';
 import { useMembersQuery } from '@/utils/useMembersQuery';
 import { useTasksQuery } from '@/utils/useTasksQuery';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
-import { getCurrentMembershipId, getCurrentOrganizationId } from '@/utils/useUser';
+import { getCurrentMembershipId, getCurrentOrganizationId, getCurrentUserId } from '@/utils/useUser';
 import {
     canUpdateOwnTimeEntries,
     canUpdateTimeEntries,
@@ -100,7 +100,7 @@ function runningDuration(entry: TimeEntry): string {
 
 // Employees can not load member names, so their own timer is "your timer"
 function stopLabel(entry: TimeEntry): string {
-    if (entry.member_id === getCurrentMembershipId()) {
+    if (entry.user_id === getCurrentUserId()) {
         return 'Stop your timer';
     }
     const name = memberNames.value.get(entry.user_id);
@@ -108,7 +108,7 @@ function stopLabel(entry: TimeEntry): string {
 }
 
 function canStop(entry: TimeEntry): boolean {
-    return entry.member_id === getCurrentMembershipId()
+    return entry.user_id === getCurrentUserId()
         ? canUpdateOwnTimeEntries()
         : canUpdateTimeEntries();
 }
@@ -146,7 +146,7 @@ async function stopTimer() {
         queryClient.invalidateQueries({ queryKey: ['latestTeamActivity'] }),
         queryClient.invalidateQueries({ queryKey: ['tasks'] }),
     ]);
-    if (entry.member_id === getCurrentMembershipId()) {
+    if (entry.user_id === getCurrentUserId()) {
         await useCurrentTimeEntryStore().fetchCurrentTimeEntry();
     }
 }
