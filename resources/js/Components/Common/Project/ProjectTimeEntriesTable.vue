@@ -18,7 +18,11 @@ import { useTimeEntriesReportQuery } from '@/utils/useTimeEntriesReportQuery';
 import { useMembersQuery } from '@/utils/useMembersQuery';
 import { useTasksQuery } from '@/utils/useTasksQuery';
 import { useOrganizationQuery } from '@/utils/useOrganizationQuery';
-import { getCurrentMembershipId, getCurrentOrganizationId, getCurrentUserId } from '@/utils/useUser';
+import {
+    getCurrentMembershipId,
+    getCurrentOrganizationId,
+    getCurrentUserId,
+} from '@/utils/useUser';
 import {
     canUpdateOwnTimeEntries,
     canUpdateTimeEntries,
