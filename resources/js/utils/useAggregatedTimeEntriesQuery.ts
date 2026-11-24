@@ -9,7 +9,8 @@ import { computed, type ComputedRef, unref } from 'vue';
 
 export function useAggregatedTimeEntriesQuery(
     queryKeyPrefix: string,
-    filterParams: ComputedRef<AggregatedTimeEntriesQueryParams>
+    filterParams: ComputedRef<AggregatedTimeEntriesQueryParams>,
+    options: { enabled?: () => boolean } = {}
 ) {
     const query = useQuery<ReportingResponse>({
         queryKey: computed(() => [
@@ -25,7 +26,9 @@ export function useAggregatedTimeEntriesQuery(
                 },
                 queries: unref(filterParams),
             }),
-        enabled: computed(() => !!getCurrentOrganizationId()),
+        enabled: computed(
+            () => !!getCurrentOrganizationId() && (options.enabled ? options.enabled() : true)
+        ),
         placeholderData: (previousData) => previousData,
         staleTime: 1000 * 30,
     });
