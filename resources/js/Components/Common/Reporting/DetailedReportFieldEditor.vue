@@ -18,6 +18,7 @@ import {
 } from '@/packages/ui/src/Input/useResizableDropdown';
 import { formatHumanReadableDuration, getLocalizedDayJs } from '@/packages/ui/src/utils/time';
 import { changeEntryDate, changeEntryTimes, changeEntryDuration } from './reportTimeEdits';
+import { buildTaskFilterOptions } from '@/Components/Common/Task/taskFilterOptions';
 import type { TimeEntry } from '@/packages/api/src';
 import type {
     ReportEditableField,
@@ -101,26 +102,22 @@ const listField = computed(() =>
 const clientsById = computed(
     () => new Map(props.context.clients.map((client) => [client.id, client.name]))
 );
-// Task names used in other projects, most used first, offered for creation in this project.
+// Task names in use in other projects, most used first, offered for creation in this project.
+// Old spellings of a name the project already has, or of one in use now, aren't offered.
 const taskSuggestions = computed<Option[]>(() => {
     const projectId = selectedEntry.value.project_id;
     if (props.field !== 'task' || !projectId || !props.context.createTask) return [];
-    const existing = new Set(
-        props.context.tasks
-            .filter((task) => task.project_id === projectId)
-            .map((task) => task.name.trim().toLowerCase())
+    const projectTaskIds = new Set(
+        props.context.tasks.filter((task) => task.project_id === projectId).map((task) => task.id)
     );
-    const counts = new Map<string, { name: string; count: number }>();
-    for (const task of props.context.tasks) {
-        const name = task.name.trim();
-        const key = name.toLowerCase();
-        if (!name || existing.has(key)) continue;
-        const suggestion = counts.get(key) ?? { name, count: 0 };
-        suggestion.count++;
-        counts.set(key, suggestion);
-    }
-    return [...counts.values()]
-        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+    return buildTaskFilterOptions(props.context.tasks, [])
+        .filter(
+            (option) =>
+                option.name &&
+                !option.isLegacy &&
+                !option.taskIds.some((taskId) => projectTaskIds.has(taskId))
+        )
+        .sort((a, b) => b.taskIds.length - a.taskIds.length || a.name.localeCompare(b.name))
         .map(({ name }) => ({ id: `new:${name.toLowerCase()}`, name, create: name }));
 });
 const options = computed<Option[]>(() => {
