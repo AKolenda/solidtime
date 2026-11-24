@@ -11,6 +11,22 @@ function label(header: Header<Row, unknown>): string {
     return typeof header_ === 'string' ? header_ : '';
 }
 
+// Arrow keys resize a focused grip by 10px (Shift: 50px); Enter or Delete restores the default.
+function onGripKeydown(event: KeyboardEvent, header: Header<Row, unknown>) {
+    const column = header.column;
+    if (event.key === 'Enter' || event.key === 'Delete') {
+        event.preventDefault();
+        column.resetSize();
+        return;
+    }
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const step = (event.shiftKey ? 50 : 10) * (event.key === 'ArrowLeft' ? -1 : 1);
+    const minSize = column.columnDef.minSize ?? 20;
+    const size = Math.max(minSize, column.getSize() + step);
+    header.getContext().table.setColumnSizing((sizing) => ({ ...sizing, [column.id]: size }));
+}
+
 function alignsRight(header: Header<Row, unknown>): boolean {
     return (header.column.columnDef.meta as { align?: 'right' } | undefined)?.align === 'right';
 }
@@ -36,14 +52,17 @@ function alignsRight(header: Header<Row, unknown>): boolean {
             <div
                 v-if="header.column.getCanResize()"
                 role="separator"
+                tabindex="0"
                 aria-orientation="vertical"
                 :aria-label="`Resize ${label(header)} column`"
-                class="group/resize absolute inset-y-0 right-0 z-10 w-3 cursor-col-resize touch-none select-none"
+                :aria-valuenow="header.getSize()"
+                class="group/resize absolute inset-y-0 right-0 z-10 w-3 cursor-col-resize touch-none select-none focus-visible:outline-none"
                 @mousedown="header.getResizeHandler()($event)"
                 @touchstart="header.getResizeHandler()($event)"
-                @dblclick="header.column.resetSize()">
+                @dblclick="header.column.resetSize()"
+                @keydown="onGripKeydown($event, header)">
                 <span
-                    class="absolute inset-y-1 right-0 w-px transition-colors duration-200 group-hover/resize:bg-accent-400"
+                    class="absolute inset-y-1 right-0 w-px transition-colors duration-200 group-hover/resize:bg-accent-400 group-focus-visible/resize:bg-accent-400"
                     :class="
                         header.column.getIsResizing() ? 'bg-accent-400' : 'bg-transparent'
                     "></span>
