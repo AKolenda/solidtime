@@ -35,7 +35,7 @@ import {
 import { useAggregatedTimeEntriesQuery } from '@/utils/useAggregatedTimeEntriesQuery';
 import { useMembersQuery } from '@/utils/useMembersQuery';
 import { useReportingStore } from '@/utils/useReporting';
-import { getCurrentMembershipId, getCurrentRole } from '@/utils/useUser';
+import { getCurrentMembershipId, getCurrentRole, getCurrentUser } from '@/utils/useUser';
 
 type View = 'days' | 'weeks';
 type Column = { id: string; label: string; days: string[]; weekStart?: Dayjs };
@@ -110,11 +110,7 @@ const columns = computed<Column[]>(() => {
 
 const baseParams = computed<AggregatedTimeEntriesQueryParams>(() => ({
     start: rangeStart.value.startOf('day').utc().format(),
-    end: rangeStart.value
-        .add(rangeDayCount.value - 1, 'day')
-        .endOf('day')
-        .utc()
-        .format(),
+    end: rangeStart.value.add(rangeDayCount.value, 'day').startOf('day').utc().format(),
     group: 'user',
     sub_group: 'day',
     type: 'work',
@@ -129,17 +125,23 @@ const noProjectParams = computed<AggregatedTimeEntriesQueryParams>(() => ({
     project_ids: ['none'],
 }));
 
-const { data: allResponse, isPending: allPending } = useAggregatedTimeEntriesQuery(
-    'weekly',
-    baseParams
-);
-const { data: noProjectResponse, isPending: noProjectPending } = useAggregatedTimeEntriesQuery(
-    'weekly-no-project',
-    noProjectParams,
-    { enabled: () => jobsOnly.value }
-);
+// No previous-key placeholders: rows from one filter must never mix with another's.
+const {
+    data: allResponse,
+    isPending: allPending,
+    isError: allError,
+} = useAggregatedTimeEntriesQuery('weekly', baseParams, { keepPreviousData: false });
+const {
+    data: noProjectResponse,
+    isPending: noProjectPending,
+    isError: noProjectError,
+} = useAggregatedTimeEntriesQuery('weekly-no-project', noProjectParams, {
+    enabled: () => jobsOnly.value,
+    keepPreviousData: false,
+});
 
 const isLoading = computed(() => allPending.value || (jobsOnly.value && noProjectPending.value));
+const isError = computed(() => allError.value || (jobsOnly.value && noProjectError.value));
 
 function secondsByUserAndDay(data: AggregatedTimeEntries | undefined) {
     const result = new Map<string, Map<string, number>>();
@@ -157,15 +159,29 @@ function secondsByUserAndDay(data: AggregatedTimeEntries | undefined) {
 const { getNameForReportingRowEntry } = useReportingStore();
 const { members } = useMembersQuery({ enabled: () => !isEmployee });
 
+// Everyone in the report gets a row, so people with no hours show up as zeros.
+const rosterUserIds = computed<string[]>(() => {
+    if (isEmployee) return [getCurrentUser().id];
+    return members.value
+        .filter((member) =>
+            selectedMembers.value.length > 0
+                ? selectedMembers.value.includes(member.id)
+                : !member.is_placeholder
+        )
+        .map((member) => member.user_id);
+});
+
 const rows = computed<Row[]>(() => {
-    if (jobsOnly.value && !noProjectResponse.value) return [];
+    if (isLoading.value || isError.value) return [];
     const all = secondsByUserAndDay(allResponse.value?.data as AggregatedTimeEntries | undefined);
     const noProject = jobsOnly.value
         ? secondsByUserAndDay(noProjectResponse.value?.data as AggregatedTimeEntries | undefined)
         : new Map<string, Map<string, number>>();
 
-    return [...all.entries()]
-        .map(([userId, days]) => {
+    const userIds = new Set([...rosterUserIds.value, ...all.keys()]);
+    return [...userIds]
+        .map((userId) => {
+            const days = all.get(userId) ?? new Map<string, number>();
             const cells = columns.value.map((column) =>
                 column.days.reduce(
                     (sum, day) =>
@@ -307,6 +323,8 @@ function toggleRow(row: Row) {
 }
 
 function csvCell(value: string): string {
+    // Keep spreadsheets from running a name like "=SUM(...)" as a formula.
+    if (/^[=+\-@\t\r]/.test(value)) value = `'${value}`;
     return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
@@ -318,7 +336,7 @@ function exportCsv() {
     const header = [
         'Employee',
         ...columns.value.map((column) =>
-            view.value === 'weeks' ? `Week of ${column.days[0] ?? column.label}` : column.days[0]!
+            column.weekStart ? `Week of ${column.weekStart.format('YYYY-MM-DD')}` : column.days[0]!
         ),
         view.value === 'weeks' ? 'Average per week' : 'Total',
     ];
@@ -473,12 +491,19 @@ const segmentClass =
                             data-testid="weekly_row"
                             @click="view === 'days' && toggleRow(row)">
                             <div
-                                class="pl-4 sm:pl-6 lg:pl-8 min-w-0 gap-1.5 sticky left-0 z-[1] bg-default-background">
-                                <ChevronRight
+                                class="pl-4 sm:pl-6 lg:pl-8 min-w-0 sticky left-0 z-[1] bg-default-background">
+                                <button
                                     v-if="view === 'days'"
-                                    class="w-4 h-4 shrink-0 text-icon-default transition-transform"
-                                    :class="expanded.has(row.userId) ? 'rotate-90' : ''" />
-                                <span class="truncate">{{ row.name }}</span>
+                                    type="button"
+                                    class="flex items-center gap-1.5 min-w-0 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    :aria-expanded="expanded.has(row.userId)"
+                                    @click.stop="toggleRow(row)">
+                                    <ChevronRight
+                                        class="w-4 h-4 shrink-0 text-icon-default transition-transform"
+                                        :class="expanded.has(row.userId) ? 'rotate-90' : ''" />
+                                    <span class="truncate">{{ row.name }}</span>
+                                </button>
+                                <span v-else class="truncate">{{ row.name }}</span>
                             </div>
                             <div
                                 v-for="(seconds, index) in row.cells"
@@ -520,6 +545,11 @@ const segmentClass =
                             }}
                         </div>
                         <div></div>
+                    </div>
+                    <div
+                        v-else-if="isError"
+                        class="col-span-full py-16 text-center text-text-tertiary">
+                        Couldn't load hours. Try again.
                     </div>
                     <div v-else-if="isLoading" class="col-span-full flex justify-center py-16">
                         <LoadingSpinner />

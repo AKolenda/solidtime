@@ -27,8 +27,9 @@ const params = computed<AggregatedTimeEntriesQueryParams>(() => ({
     member_id: isEmployee ? getCurrentMembershipId() : undefined,
 }));
 
-const { data, isPending } = useAggregatedTimeEntriesQuery('weekly-jobs', params, {
+const { data, isPending, isError } = useAggregatedTimeEntriesQuery('weekly-jobs', params, {
     enabled: () => isEmployee || props.memberId !== null,
+    keepPreviousData: false,
 });
 
 const { projects } = useProjectsQuery();
@@ -63,9 +64,15 @@ const jobs = computed(() => {
 
 <template>
     <div
-        v-if="isPending || jobs.length === 0"
+        v-if="isError || isPending || jobs.length === 0"
         class="col-span-full border-b border-row-separator bg-secondary py-2.5 pl-10 sm:pl-12 lg:pl-14 text-xs text-text-tertiary">
-        {{ isPending ? 'Loading jobs…' : 'No job time this week' }}
+        {{
+            isError
+                ? "Couldn't load jobs. Try again."
+                : isPending
+                  ? 'Loading jobs…'
+                  : 'No job time this week'
+        }}
     </div>
     <div
         v-for="job in jobs"
