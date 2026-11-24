@@ -56,6 +56,8 @@ function alignsRight(header: Header<Row, unknown>): boolean {
                 aria-orientation="vertical"
                 :aria-label="`Resize ${label(header)} column`"
                 :aria-valuenow="header.getSize()"
+                :aria-valuemin="header.column.columnDef.minSize ?? 20"
+                :aria-valuemax="header.column.columnDef.maxSize ?? Number.MAX_SAFE_INTEGER"
                 class="group/resize absolute inset-y-0 right-0 z-10 w-3 cursor-col-resize touch-none select-none focus-visible:outline-none"
                 @mousedown="header.getResizeHandler()($event)"
                 @touchstart="header.getResizeHandler()($event)"
