@@ -119,6 +119,15 @@ export function createNavigationCommands(
             priority: GROUP_PRIORITIES.navigation + 6,
         },
         {
+            id: 'nav-reporting-weekly',
+            label: 'Go to Weekly Hours',
+            icon: ChartBarIcon,
+            keywords: ['weekly', 'hours', 'employees', 'week', 'payroll'],
+            group: 'navigation',
+            action: () => navigate('reporting.weekly'),
+            priority: GROUP_PRIORITIES.navigation + 6,
+        },
+        {
             id: 'nav-reporting-shared',
             label: 'Go to Shared Reports',
             icon: ChartBarIcon,

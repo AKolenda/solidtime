@@ -225,6 +225,11 @@ const page = usePage<{
                                         show: true,
                                     },
                                     {
+                                        title: 'Weekly',
+                                        route: 'reporting.weekly',
+                                        show: true,
+                                    },
+                                    {
                                         title: 'Shared',
                                         route: 'reporting.shared',
                                         show: canViewReport(),
@@ -233,6 +238,7 @@ const page = usePage<{
                                 :current="
                                     route().current('reporting') ||
                                     route().current('reporting.detailed') ||
+                                    route().current('reporting.weekly') ||
                                     route().current('reporting.shared')
                                 "
                                 :href="route('reporting')">

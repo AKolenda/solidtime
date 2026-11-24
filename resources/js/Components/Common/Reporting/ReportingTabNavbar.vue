@@ -5,7 +5,7 @@ import { computed } from 'vue';
 import { TabBar, TabBarItem } from '@/packages/ui/src';
 
 const props = defineProps<{
-    active: 'reporting' | 'detailed' | 'shared';
+    active: 'reporting' | 'detailed' | 'weekly' | 'shared';
 }>();
 
 const showSharedReports = computed(() => canViewReport());
@@ -14,6 +14,7 @@ const tabs = computed(() => {
     const items = [
         { value: 'reporting', label: 'Overview', href: route('reporting') },
         { value: 'detailed', label: 'Detailed', href: route('reporting.detailed') },
+        { value: 'weekly', label: 'Weekly', href: route('reporting.weekly') },
     ];
     if (showSharedReports.value) {
         items.push({
