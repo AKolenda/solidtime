@@ -140,8 +140,25 @@ const {
     keepPreviousData: false,
 });
 
-const isLoading = computed(() => allPending.value || (jobsOnly.value && noProjectPending.value));
-const isError = computed(() => allError.value || (jobsOnly.value && noProjectError.value));
+// Non-employees also wait for the member roster, so nobody is missing from the table or export.
+const {
+    members,
+    isPending: membersPending,
+    isError: membersError,
+} = useMembersQuery({ enabled: () => !isEmployee });
+
+const isLoading = computed(
+    () =>
+        allPending.value ||
+        (jobsOnly.value && noProjectPending.value) ||
+        (!isEmployee && membersPending.value)
+);
+const isError = computed(
+    () =>
+        allError.value ||
+        (jobsOnly.value && noProjectError.value) ||
+        (!isEmployee && membersError.value)
+);
 
 function secondsByUserAndDay(data: AggregatedTimeEntries | undefined) {
     const result = new Map<string, Map<string, number>>();
@@ -157,7 +174,6 @@ function secondsByUserAndDay(data: AggregatedTimeEntries | undefined) {
 }
 
 const { getNameForReportingRowEntry } = useReportingStore();
-const { members } = useMembersQuery({ enabled: () => !isEmployee });
 
 // Everyone in the report gets a row, so people with no hours show up as zeros.
 const rosterUserIds = computed<string[]>(() => {
@@ -325,7 +341,7 @@ function toggleRow(row: Row) {
 function csvCell(value: string): string {
     // Keep spreadsheets from running a name like "=SUM(...)" as a formula.
     if (/^[=+\-@\t\r]/.test(value)) value = `'${value}`;
-    return /[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+    return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
 
 function hours(seconds: number): string {

@@ -74,25 +74,27 @@ const jobs = computed(() => {
                   : 'No job time this week'
         }}
     </div>
-    <div
-        v-for="job in jobs"
-        :key="job.key"
-        data-testid="weekly_job_row"
-        class="contents text-xs text-text-secondary [&>*]:bg-secondary [&>*]:border-b [&>*]:border-row-separator [&>*]:h-[36px] [&>*]:flex [&>*]:items-center [&>*]:px-3 [&>*]:whitespace-nowrap">
-        <div class="pl-10 sm:pl-12 lg:pl-14 min-w-0 gap-2 sticky left-0 z-[1]">
-            <span
-                class="w-2 h-2 rounded-full shrink-0"
-                :style="{ backgroundColor: job.color }"></span>
-            <span class="truncate" :title="job.name">{{ job.name }}</span>
-        </div>
+    <template v-else>
         <div
-            v-for="(seconds, index) in job.cells"
-            :key="columns[index]?.id"
-            class="justify-end"
-            :class="seconds <= 0 ? 'text-text-quaternary' : ''">
-            {{ formatSeconds(seconds) }}
+            v-for="job in jobs"
+            :key="job.key"
+            data-testid="weekly_job_row"
+            class="contents text-xs text-text-secondary [&>*]:bg-secondary [&>*]:border-b [&>*]:border-row-separator [&>*]:h-[36px] [&>*]:flex [&>*]:items-center [&>*]:px-3 [&>*]:whitespace-nowrap">
+            <div class="pl-10 sm:pl-12 lg:pl-14 min-w-0 gap-2 sticky left-0 z-[1]">
+                <span
+                    class="w-2 h-2 rounded-full shrink-0"
+                    :style="{ backgroundColor: job.color }"></span>
+                <span class="truncate" :title="job.name">{{ job.name }}</span>
+            </div>
+            <div
+                v-for="(seconds, index) in job.cells"
+                :key="columns[index]?.id"
+                class="justify-end"
+                :class="seconds <= 0 ? 'text-text-quaternary' : ''">
+                {{ formatSeconds(seconds) }}
+            </div>
+            <div class="justify-end font-medium">{{ formatSeconds(job.total) }}</div>
+            <div></div>
         </div>
-        <div class="justify-end font-medium">{{ formatSeconds(job.total) }}</div>
-        <div></div>
-    </div>
+    </template>
 </template>
