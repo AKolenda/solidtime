@@ -30,6 +30,16 @@ const { tasks } = useTasksQuery();
 
 const taskOptions = computed(() => buildTaskFilterOptions(tasks.value, props.projectIds));
 
+// Names no longer given to new tasks are left out unless a project is picked, where they are
+// that project's own tasks, or they are already selected and must stay removable.
+const listedOptions = computed(() => {
+    if (props.projectIds.length > 0) return taskOptions.value;
+    const selectedIds = new Set(model.value);
+    return taskOptions.value.filter(
+        (option) => !option.isLegacy || option.taskIds.some((id) => selectedIds.has(id))
+    );
+});
+
 const selectedOptionKeys = computed<string[]>({
     get() {
         const selected = getSelectedTaskOptionKeys(taskOptions.value, model.value);
@@ -91,7 +101,7 @@ watch(
     <MultiselectDropdown
         v-model="selectedOptionKeys"
         search-placeholder="Search for a Task..."
-        :items="taskOptions"
+        :items="listedOptions"
         :get-key-from-item="getKeyFromItem"
         :get-name-for-item="getNameForItem"
         :get-date-for-item="getDateForItem"
